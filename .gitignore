@@ -1,0 +1,5 @@
+# Repository-local AI settings and secrets
+.Codex/settings.local.json
+.Codex/tmp/
+.env
+.env.*
