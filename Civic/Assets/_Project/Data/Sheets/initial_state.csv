@@ -1,0 +1,5 @@
+kind,id,amount
+resource,population,3
+resource,wheat,5
+resource,construction_power,5
+building,capital,1

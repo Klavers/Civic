@@ -17,7 +17,7 @@ namespace Civic.Editor.UI
             "- Base and Variant prefab existence/type\n" +
             "- Base/Variant inheritance\n" +
             "- Missing scripts and serialized references\n" +
-            "- Canvas, input EventSystem, and idle panel components";
+            "- Canvas, input EventSystem, and Civic HUD components";
 
         [MenuItem("Tools/Civic/UI/Validate")]
         private static void ValidateFromMenu()
@@ -51,23 +51,23 @@ namespace Civic.Editor.UI
         public static IReadOnlyList<string> CollectErrors(string generatedFolder, string editableFolder)
         {
             var errors = new List<string>();
-            var panelBase = LoadPrefab(generatedFolder + "/IdlePanel_Base.prefab", errors);
-            var panel = LoadPrefab(editableFolder + "/IdlePanel.prefab", errors);
+            var hudBase = LoadPrefab(generatedFolder + "/CivicHud_Base.prefab", errors);
+            var hud = LoadPrefab(editableFolder + "/CivicHud.prefab", errors);
             var rootBase = LoadPrefab(generatedFolder + "/UIRoot_Base.prefab", errors);
             var root = LoadPrefab(editableFolder + "/UIRoot.prefab", errors);
 
-            ValidatePrefabType(panelBase, PrefabAssetType.Regular, "IdlePanel Base", errors);
-            ValidatePrefabType(panel, PrefabAssetType.Variant, "IdlePanel Variant", errors);
+            ValidatePrefabType(hudBase, PrefabAssetType.Regular, "CivicHud Base", errors);
+            ValidatePrefabType(hud, PrefabAssetType.Variant, "CivicHud Variant", errors);
             ValidatePrefabType(rootBase, PrefabAssetType.Regular, "UIRoot Base", errors);
             ValidatePrefabType(root, PrefabAssetType.Variant, "UIRoot Variant", errors);
 
-            ValidateVariantSource(panel, panelBase, "IdlePanel", errors);
+            ValidateVariantSource(hud, hudBase, "CivicHud", errors);
             ValidateVariantSource(root, rootBase, "UIRoot", errors);
 
-            if (panel != null)
+            if (hud != null)
             {
-                ValidatePanel(panel, errors);
-                ValidateMissingScripts(panel, "IdlePanel", errors);
+                ValidateHud(hud, errors);
+                ValidateMissingScripts(hud, "CivicHud", errors);
             }
 
             if (root != null)
@@ -112,23 +112,42 @@ namespace Civic.Editor.UI
             }
         }
 
-        private static void ValidatePanel(GameObject panel, ICollection<string> errors)
+        private static void ValidateHud(GameObject hud, ICollection<string> errors)
         {
-            var view = panel.GetComponent<IdlePanelView>();
-            var controller = panel.GetComponent<DummyIdleGameController>();
+            var view = hud.GetComponent<CivicHudView>();
+            var controller = hud.GetComponent<CivicHudController>();
             if (view == null || !view.HasRequiredReferences)
             {
-                errors.Add("IdlePanelView is missing or has unassigned serialized references.");
+                errors.Add("CivicHudView is missing or has unassigned serialized references.");
             }
 
-            if (controller == null || controller.View != view)
+            if (controller == null || !controller.HasRequiredReferences || controller.View != view)
             {
-                errors.Add("DummyIdleGameController is missing or is not bound to IdlePanelView.");
+                errors.Add("CivicHudController is missing, lacks required references, or is not bound to CivicHudView.");
             }
 
-            if (panel.GetComponent<Image>() == null)
+            if (controller != null && controller.DataSource == null)
             {
-                errors.Add("IdlePanel root must have a background Image.");
+                errors.Add("CivicHudController is missing CivicGameDataSource.");
+            }
+
+            if (view != null && (view.BuildingActionRows.Count == 0 || view.TechnologyActionRows.Count == 0))
+            {
+                errors.Add("CivicHudView must have building and technology action row slots.");
+            }
+
+            if (view != null &&
+                (view.BuildingActionRows.Count != view.BuildingActionInfoLabels.Count ||
+                view.BuildingActionRows.Count != view.BuildingActionButtons.Count ||
+                view.TechnologyActionRows.Count != view.TechnologyActionInfoLabels.Count ||
+                view.TechnologyActionRows.Count != view.TechnologyActionButtons.Count))
+            {
+                errors.Add("CivicHudView action row, info label, and button slot counts must match.");
+            }
+
+            if (hud.GetComponent<Image>() == null)
+            {
+                errors.Add("CivicHud root must have a background Image.");
             }
         }
 
@@ -152,9 +171,14 @@ namespace Civic.Editor.UI
                 errors.Add("UIRoot EventSystem is missing InputSystemUIInputModule.");
             }
 
-            if (root.GetComponentInChildren<IdlePanelView>(true) == null)
+            if (root.GetComponentInChildren<CivicHudView>(true) == null)
             {
-                errors.Add("UIRoot does not contain the editable IdlePanel prefab.");
+                errors.Add("UIRoot does not contain the editable CivicHud prefab.");
+            }
+
+            if (root.transform.Find("Canvas/IdlePanel") != null)
+            {
+                errors.Add("UIRoot still contains the legacy IdlePanel.");
             }
         }
 

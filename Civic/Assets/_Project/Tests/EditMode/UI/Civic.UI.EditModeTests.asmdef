@@ -2,6 +2,7 @@
   "name": "Civic.UI.EditModeTests",
   "rootNamespace": "Civic.UI.Tests",
   "references": [
+    "Civic.Simulation.Runtime",
     "Civic.UI.Runtime",
     "Civic.UI.Editor",
     "UnityEngine.UI"

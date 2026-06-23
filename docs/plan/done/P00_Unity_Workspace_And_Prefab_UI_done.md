@@ -1,5 +1,9 @@
 # P00 — Unity 작업환경 및 프리팹 UI 기반
 
+> **Status**: done
+> **Archived**: 2026-06-24 — implementation and verification completed; moved to `docs/plan/done/`.
+
+
 ## §0 Context
 
 Unity 프로젝트 자체는 `6000.0.76f1`, URP, Input System, uGUI, Test Framework 구성을 갖췄지만 저장소 운영 스킬과 Unity 에셋 제작 절차가 연결되지 않았다. 이 계획은 Git LFS 제거, 스킬 경로 정리, Git Bash 호출 고정, Editor 시점의 프리팹 생성·검증 기반을 한 변경으로 정착시킨다.

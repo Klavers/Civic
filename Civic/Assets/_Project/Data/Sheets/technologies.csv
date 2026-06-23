@@ -1,0 +1,3 @@
+id,displayNameKo,eraId,cost,unlocksEraId,prerequisiteTechnologyIds,taxRateAdd,sortOrder
+woodworking,목공,primitive,3,,,0.01,10
+agriculture,농업,primitive,5,ancient,,0.02,20
