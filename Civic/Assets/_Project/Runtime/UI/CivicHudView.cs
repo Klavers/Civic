@@ -59,6 +59,9 @@ namespace Civic.UI
         [SerializeField] private Text[] buildingGdpDeltaLabels;
         [SerializeField] private Button[] buildingActionButtons;
         [SerializeField] private CivicTooltipTrigger[] buildingButtonTooltips;
+        [SerializeField] private GameObject[] eraTabRows;
+        [SerializeField] private Text[] eraTabLabels;
+        [SerializeField] private Button[] eraTabButtons;
         [SerializeField] private GameObject[] technologyActionRows;
         [SerializeField] private Text[] technologyActionInfoLabels;
         [SerializeField] private Button[] technologyActionButtons;
@@ -66,6 +69,7 @@ namespace Civic.UI
         [SerializeField] private CivicTooltipView tooltipView;
 
         private string[] currentBuildingActionIds = Array.Empty<string>();
+        private string[] currentEraTabIds = Array.Empty<string>();
         private string[] currentTechnologyActionIds = Array.Empty<string>();
 
         public event Action ResourcesPanelRequested;
@@ -73,6 +77,7 @@ namespace Civic.UI
         public event Action TechnologiesPanelRequested;
         public event Action<string> BuildRequested;
         public event Action<string> ResearchRequested;
+        public event Action<string> EraTabRequested;
         public event Action FoodToggleRequested;
 
         public bool HasRequiredReferences =>
@@ -97,6 +102,7 @@ namespace Civic.UI
             technologiesPanelButton != null &&
             HasResourceRows() &&
             HasBuildingRows() &&
+            HasActionRows(eraTabRows, eraTabLabels, eraTabButtons) &&
             HasActionRows(technologyActionRows, technologyActionInfoLabels, technologyActionButtons) &&
             foodToggleButton != null &&
             tooltipView != null &&
@@ -119,6 +125,9 @@ namespace Civic.UI
         public IReadOnlyList<Text> BuildingGdpDeltaLabels => buildingGdpDeltaLabels ?? Array.Empty<Text>();
         public IReadOnlyList<Button> BuildingActionButtons => buildingActionButtons ?? Array.Empty<Button>();
         public IReadOnlyList<CivicTooltipTrigger> BuildingButtonTooltips => buildingButtonTooltips ?? Array.Empty<CivicTooltipTrigger>();
+        public IReadOnlyList<GameObject> EraTabRows => eraTabRows ?? Array.Empty<GameObject>();
+        public IReadOnlyList<Text> EraTabLabels => eraTabLabels ?? Array.Empty<Text>();
+        public IReadOnlyList<Button> EraTabButtons => eraTabButtons ?? Array.Empty<Button>();
         public IReadOnlyList<GameObject> TechnologyActionRows => technologyActionRows ?? Array.Empty<GameObject>();
         public IReadOnlyList<Text> TechnologyActionInfoLabels => technologyActionInfoLabels ?? Array.Empty<Text>();
         public IReadOnlyList<Button> TechnologyActionButtons => technologyActionButtons ?? Array.Empty<Button>();
@@ -141,11 +150,12 @@ namespace Civic.UI
             technologiesPanelButton?.onClick.RemoveListener(NotifyTechnologiesPanelRequested);
             foodToggleButton?.onClick.RemoveListener(NotifyFoodToggleRequested);
             ClearActionButtons(buildingActionButtons);
+            ClearActionButtons(eraTabButtons);
             ClearActionButtons(technologyActionButtons);
             tooltipView?.Hide();
         }
 
-        public void Render(CivicGameSnapshot snapshot, CivicHudPanelMode panelMode, bool showFoodChildren)
+        public void Render(CivicGameSnapshot snapshot, CivicHudPanelMode panelMode, bool showFoodChildren, string selectedTechnologyEraId)
         {
             if (snapshot == null)
             {
@@ -169,7 +179,7 @@ namespace Civic.UI
             constructionAlertLabel.text = snapshot.HasConstructionBlocked ? "건설 불가" : "건설 가능";
             rightResourcesLabel.supportRichText = true;
             rightResourcesLabel.text = BuildRightResourceText(snapshot, showFoodChildren);
-            RenderDetail(snapshot, panelMode);
+            RenderDetail(snapshot, panelMode, selectedTechnologyEraId);
         }
 
         private static string BuildRightResourceText(CivicGameSnapshot snapshot, bool showFoodChildren)
@@ -201,7 +211,7 @@ namespace Civic.UI
             return resource.FoodConversion > 0d;
         }
 
-        private void RenderDetail(CivicGameSnapshot snapshot, CivicHudPanelMode panelMode)
+        private void RenderDetail(CivicGameSnapshot snapshot, CivicHudPanelMode panelMode, string selectedTechnologyEraId)
         {
             detailBodyLabel.gameObject.SetActive(false);
             resourceDetailPanel.SetActive(panelMode == CivicHudPanelMode.Resources);
@@ -214,25 +224,29 @@ namespace Civic.UI
                     detailTitleLabel.text = "자원 상세";
                     RenderResourceDetailRows(snapshot);
                     RenderBuildingActionButtons(snapshot, false);
-                    RenderTechnologyActionButtons(snapshot, false);
+                    RenderEraTabs(snapshot, false, selectedTechnologyEraId);
+                    RenderTechnologyActionButtons(snapshot, false, selectedTechnologyEraId);
                     break;
                 case CivicHudPanelMode.Buildings:
                     detailTitleLabel.text = "건물";
                     RenderResourceDetailRows(null);
                     RenderBuildingActionButtons(snapshot, true);
-                    RenderTechnologyActionButtons(snapshot, false);
+                    RenderEraTabs(snapshot, false, selectedTechnologyEraId);
+                    RenderTechnologyActionButtons(snapshot, false, selectedTechnologyEraId);
                     break;
                 case CivicHudPanelMode.Technologies:
                     detailTitleLabel.text = "기술";
                     RenderResourceDetailRows(null);
                     RenderBuildingActionButtons(snapshot, false);
-                    RenderTechnologyActionButtons(snapshot, true);
+                    RenderEraTabs(snapshot, true, selectedTechnologyEraId);
+                    RenderTechnologyActionButtons(snapshot, true, selectedTechnologyEraId);
                     break;
                 default:
                     detailTitleLabel.text = "자원 상세";
                     RenderResourceDetailRows(snapshot);
                     RenderBuildingActionButtons(snapshot, false);
-                    RenderTechnologyActionButtons(snapshot, false);
+                    RenderEraTabs(snapshot, false, selectedTechnologyEraId);
+                    RenderTechnologyActionButtons(snapshot, false, selectedTechnologyEraId);
                     break;
             }
         }
@@ -468,9 +482,50 @@ namespace Civic.UI
             ConfigureTooltip(buttonTooltip, building.CanBuild ? string.Empty : building.BlockReason);
         }
 
-        private void RenderTechnologyActionButtons(CivicGameSnapshot snapshot, bool visible)
+        private void RenderEraTabs(CivicGameSnapshot snapshot, bool visible, string selectedEraId)
+        {
+            var eras = snapshot.Eras
+                .Where(era => era.IsVisible)
+                .OrderBy(era => era.Order)
+                .Take(EraTabRows.Count)
+                .ToArray();
+            EnsureActionIdBuffers();
+
+            for (var index = 0; index < EraTabRows.Count; index++)
+            {
+                var row = EraTabRows[index];
+                var label = EraTabLabels[index];
+                var button = EraTabButtons[index];
+                if (row == null || label == null || button == null)
+                {
+                    continue;
+                }
+
+                if (!visible || index >= eras.Length)
+                {
+                    currentEraTabIds[index] = string.Empty;
+                    row.SetActive(false);
+                    label.text = string.Empty;
+                    button.interactable = false;
+                    SetButtonLabel(button, string.Empty);
+                    continue;
+                }
+
+                var era = eras[index];
+                var isSelected = era.Id == selectedEraId;
+                currentEraTabIds[index] = era.Id;
+                row.SetActive(true);
+                label.text = era.DisplayNameKo;
+                label.color = isSelected ? Color.yellow : NeutralMarketColor;
+                button.interactable = !isSelected;
+                SetButtonLabel(button, era.DisplayNameKo);
+            }
+        }
+
+        private void RenderTechnologyActionButtons(CivicGameSnapshot snapshot, bool visible, string selectedEraId)
         {
             var technologies = snapshot.Technologies
+                .Where(technology => technology.EraId == selectedEraId)
                 .Take(TechnologyActionRows.Count)
                 .ToArray();
             EnsureActionIdBuffers();
@@ -565,6 +620,13 @@ namespace Civic.UI
                     yield return new ResourceDetailFlowEntry(
                         $"{source.DisplayNameKo} x{source.Count} | {source.DisplayNameKo} 인구 총량 {source.Amount.ToShortString()}",
                         "인구 생산 건물은 건설 시 총 인구를 즉시 늘리며, 초당 생산 흐름에는 포함되지 않습니다.");
+                }
+
+                foreach (var entry in snapshot.PopulationConsumption)
+                {
+                    yield return new ResourceDetailFlowEntry(
+                        $"{entry.BuildingDisplayNameKo} x{entry.BuildingCount} | {entry.ResourceDisplayNameKo} 소비 {entry.ConsumedAmount.ToShortString()} → 인구 +{entry.ProducedPopulation.ToShortString()}/틱",
+                        "인구 생산 건물은 1초 tick마다 해금된 인구층 소비 자원을 자원별로 최대 건물 수만큼 소비하고, 실제 소비량만큼 정수 인구를 추가합니다.");
                 }
             }
 
@@ -895,6 +957,12 @@ namespace Civic.UI
                 BuildingActionButtons[index]?.onClick.AddListener(() => NotifyBuildRequested(capturedIndex));
             }
 
+            for (var index = 0; index < EraTabButtons.Count; index++)
+            {
+                var capturedIndex = index;
+                EraTabButtons[index]?.onClick.AddListener(() => NotifyEraTabRequested(capturedIndex));
+            }
+
             for (var index = 0; index < TechnologyActionButtons.Count; index++)
             {
                 var capturedIndex = index;
@@ -912,6 +980,11 @@ namespace Civic.UI
             if (currentTechnologyActionIds.Length != TechnologyActionRows.Count)
             {
                 currentTechnologyActionIds = new string[TechnologyActionRows.Count];
+            }
+
+            if (currentEraTabIds.Length != EraTabRows.Count)
+            {
+                currentEraTabIds = new string[EraTabRows.Count];
             }
         }
 
@@ -944,6 +1017,14 @@ namespace Civic.UI
             if (index >= 0 && index < currentTechnologyActionIds.Length && !string.IsNullOrEmpty(currentTechnologyActionIds[index]))
             {
                 ResearchRequested?.Invoke(currentTechnologyActionIds[index]);
+            }
+        }
+
+        private void NotifyEraTabRequested(int index)
+        {
+            if (index >= 0 && index < currentEraTabIds.Length && !string.IsNullOrEmpty(currentEraTabIds[index]))
+            {
+                EraTabRequested?.Invoke(currentEraTabIds[index]);
             }
         }
 

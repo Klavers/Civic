@@ -29,9 +29,20 @@ namespace Civic.Simulation
         public CivicNumber BasePrice { get; }
         public double FoodConversion { get; }
         public bool IsStockpile { get; }
+        public bool IsPopulationConsumption { get; }
+        public string RequiredTechnologyId { get; }
         public int SortOrder { get; }
 
-        public ResourceDefinition(string id, string displayNameKo, ResourceCategory category, CivicNumber basePrice, double foodConversion, bool isStockpile, int sortOrder)
+        public ResourceDefinition(
+            string id,
+            string displayNameKo,
+            ResourceCategory category,
+            CivicNumber basePrice,
+            double foodConversion,
+            bool isStockpile,
+            bool isPopulationConsumption,
+            string requiredTechnologyId,
+            int sortOrder)
         {
             Id = id;
             DisplayNameKo = displayNameKo;
@@ -39,6 +50,8 @@ namespace Civic.Simulation
             BasePrice = basePrice;
             FoodConversion = foodConversion;
             IsStockpile = isStockpile;
+            IsPopulationConsumption = isPopulationConsumption;
+            RequiredTechnologyId = requiredTechnologyId;
             SortOrder = sortOrder;
         }
     }
@@ -224,6 +237,8 @@ namespace Civic.Simulation
                 ParseNumber(row, "basePrice", "resources.csv", errors),
                 ParseDouble(row, "foodConversion", "resources.csv", errors),
                 ParseBool(row, "isStockpile", "resources.csv", errors),
+                ParseBool(row, "isPopulationConsumption", "resources.csv", errors),
+                Optional(row, "requiredTechnologyId"),
                 ParseInt(row, "sortOrder", "resources.csv", errors))).ToList();
         }
 
@@ -333,6 +348,14 @@ namespace Civic.Simulation
                 foreach (var amount in building.Inputs.Concat(building.Outputs))
                 {
                     RequireReference(resourceIds, amount.ResourceId, $"building {building.Id} resource reference", errors);
+                }
+            }
+
+            foreach (var resource in resources)
+            {
+                if (!string.IsNullOrEmpty(resource.RequiredTechnologyId))
+                {
+                    RequireReference(technologyIds, resource.RequiredTechnologyId, $"resource {resource.Id} requiredTechnologyId", errors);
                 }
             }
 

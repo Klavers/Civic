@@ -1,3 +1,7 @@
 id,displayNameKo,order
 primitive,원시시대,0
 ancient,고대시대,1
+classical,고전시대,2
+medieval,중세시대,3
+renaissance,르네상스시대,4
+industrial,산업시대,5

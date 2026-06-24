@@ -131,18 +131,20 @@ namespace Civic.Editor.UI
                 errors.Add("CivicHudController is missing CivicGameDataSource.");
             }
 
-            if (view != null && (view.BuildingActionRows.Count == 0 || view.TechnologyActionRows.Count == 0))
+            if (view != null && (view.BuildingActionRows.Count == 0 || view.EraTabRows.Count == 0 || view.TechnologyActionRows.Count == 0))
             {
-                errors.Add("CivicHudView must have building and technology action row slots.");
+                errors.Add("CivicHudView must have building action row, era tab, and technology action row slots.");
             }
 
             if (view != null &&
                 (view.BuildingActionRows.Count != view.BuildingActionInfoLabels.Count ||
                 view.BuildingActionRows.Count != view.BuildingActionButtons.Count ||
+                view.EraTabRows.Count != view.EraTabLabels.Count ||
+                view.EraTabRows.Count != view.EraTabButtons.Count ||
                 view.TechnologyActionRows.Count != view.TechnologyActionInfoLabels.Count ||
                 view.TechnologyActionRows.Count != view.TechnologyActionButtons.Count))
             {
-                errors.Add("CivicHudView action row, info label, and button slot counts must match.");
+                errors.Add("CivicHudView action row, era tab, info label, and button slot counts must match.");
             }
 
             if (hud.GetComponent<Image>() == null)

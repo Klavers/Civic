@@ -32,7 +32,7 @@ namespace Civic.UI.Tests
             Assert.That(hudRect.lossyScale.sqrMagnitude, Is.GreaterThan(0.01f));
 
             var initialScience = controller.Simulation.Snapshot.Science.ToDouble();
-            yield return new WaitForSeconds(0.25f);
+            yield return new WaitForSeconds(1.1f);
             Assert.That(controller.Simulation.Snapshot.Science.ToDouble(), Is.GreaterThan(initialScience));
             Assert.That(controller.View.ResourceDetailRows.Any(row => row.activeSelf), Is.True);
             Assert.That(controller.View.ResourceProducerLabels.Any(label => label.gameObject.activeInHierarchy && !string.IsNullOrEmpty(label.text)), Is.True);
@@ -75,6 +75,8 @@ namespace Civic.UI.Tests
             controller.View.TechnologiesPanelButton.onClick.Invoke();
             yield return null;
 
+            Assert.That(controller.View.EraTabRows.Any(row => row.activeSelf), Is.True);
+            Assert.That(controller.View.EraTabLabels.Any(label => label.gameObject.activeInHierarchy && label.text.Contains("원시")), Is.True);
             Assert.That(controller.View.TechnologyActionRows.Any(row => row.activeSelf), Is.True);
             Assert.That(controller.View.TechnologyActionInfoLabels.Any(label => label.gameObject.activeInHierarchy && !string.IsNullOrEmpty(label.text)), Is.True);
             var researchButton = controller.View.TechnologyActionButtons.First(button => button.gameObject.activeSelf && button.interactable);
@@ -84,6 +86,7 @@ namespace Civic.UI.Tests
             Assert.That(
                 controller.Simulation.Snapshot.Technologies.Count(technology => technology.IsResearched),
                 Is.GreaterThan(researchedBefore));
+            Assert.That(controller.View.EraTabLabels.Any(label => label.gameObject.activeInHierarchy && label.text.Contains("고대")), Is.True);
 
             Assert.DoesNotThrow(() => controller.View.FoodToggleButton.onClick.Invoke());
             Assert.That(controller.Simulation.Snapshot.Resources.Any(resource => resource.Category == ResourceCategory.Aggregate), Is.True);

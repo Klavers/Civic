@@ -130,6 +130,7 @@ PR 생성·머지는 skill `pr-workflow` 사용 (`git add .` 차단, base 자동
 | PR 생성·머지 (base 자동 감지, `git add .` 차단) | skill `pr-workflow` |
 | 세션 종료 시 핸드오프 메모 | skill `session-handoff` |
 | PR/Issue/plan 체크박스 구현 검증·갱신 | skill `check-and-verify` |
+| Unity Editor 상태 확인·UI 생성·검증·테스트 절차 | skill `unity-workflow` |
 | plan·design 깊은 검토 (인터뷰식 grilling) | skill `grill-me` / `grill-with-docs` |
 | plan/PRD 를 이슈로 분해 | skill `to-issues` |
 | 대화 맥락을 PRD 로 발행 | skill `to-prd` |
