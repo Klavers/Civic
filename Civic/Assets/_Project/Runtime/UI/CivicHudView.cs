@@ -18,6 +18,13 @@ namespace Civic.UI
         private const string TreasuryId = "treasury";
         private const string ConstructionPowerId = "construction_power";
         private const string CapitalBuildingId = "capital";
+        private const double ShortageTintStartDemandSupplyRatio = 1.5d;
+        private const double ShortageTintFullDemandSupplyRatio = 4d;
+        private const double SurplusTintStartDemandSupplyRatio = 0.75d;
+        private const double SurplusTintFullDemandSupplyRatio = 0.25d;
+        private static readonly Color NeutralMarketColor = Color.white;
+        private static readonly Color ShortageMarketColor = Color.red;
+        private static readonly Color SurplusMarketColor = Color.yellow;
 
         [SerializeField] private Text populationLabel;
         [SerializeField] private Text buildingCapacityLabel;
@@ -160,6 +167,7 @@ namespace Civic.UI
             shortageAlertLabel.text = snapshot.HasShortage ? "품귀" : "품귀 없음";
             researchAlertLabel.text = snapshot.HasResearchAvailable ? "연구 가능" : "연구 대기";
             constructionAlertLabel.text = snapshot.HasConstructionBlocked ? "건설 불가" : "건설 가능";
+            rightResourcesLabel.supportRichText = true;
             rightResourcesLabel.text = BuildRightResourceText(snapshot, showFoodChildren);
             RenderDetail(snapshot, panelMode);
         }
@@ -180,12 +188,9 @@ namespace Civic.UI
                     builder.Append("  ");
                 }
 
-                builder.Append(resource.DisplayNameKo);
-                builder.Append("  ");
-                builder.Append(resource.Stockpile.ToShortString());
-                builder.Append("  ");
-                builder.Append(resource.NetPerSecond.ToShortString());
-                builder.AppendLine("/s");
+                builder.AppendLine(WrapMarketColor(
+                    $"{resource.DisplayNameKo}  {resource.Stockpile.ToShortString()}  {resource.NetPerSecond.ToShortString()}/s",
+                    resource));
             }
 
             return builder.ToString();
@@ -252,6 +257,7 @@ namespace Civic.UI
                 if (index >= resources.Length)
                 {
                     row.SetActive(false);
+                    summaryLabel.color = NeutralMarketColor;
                     ClearResourceProducerSlots(index, producerSlotsPerRow);
                     continue;
                 }
@@ -259,6 +265,7 @@ namespace Civic.UI
                 var resource = resources[index];
                 row.SetActive(true);
                 summaryLabel.text = BuildResourceSummary(resource);
+                summaryLabel.color = GetMarketTint(resource);
                 RenderResourceProducerSlots(index, snapshot, resource, producerSlotsPerRow);
             }
         }
@@ -293,6 +300,7 @@ namespace Civic.UI
                     var entry = entries[slot];
                     box.SetActive(true);
                     label.text = entry.Text;
+                    label.color = entry.Tint;
                     ConfigureTooltip(tooltip, entry.Tooltip);
                     continue;
                 }
@@ -302,6 +310,7 @@ namespace Civic.UI
                     var extraCount = entries.Length - visibleEntryCount;
                     box.SetActive(true);
                     label.text = $"외 {extraCount}개 항목";
+                    label.color = NeutralMarketColor;
                     ConfigureTooltip(tooltip, BuildAllResourceFlowTooltip(entries));
                     continue;
                 }
@@ -310,12 +319,14 @@ namespace Civic.UI
                 {
                     box.SetActive(true);
                     label.text = "흐름 없음";
+                    label.color = NeutralMarketColor;
                     ConfigureTooltip(tooltip, string.Empty);
                     continue;
                 }
 
                 box.SetActive(false);
                 label.text = string.Empty;
+                label.color = NeutralMarketColor;
                 ConfigureTooltip(tooltip, string.Empty);
             }
         }
@@ -336,6 +347,7 @@ namespace Civic.UI
                 if (ResourceProducerLabels[flatIndex] != null)
                 {
                     ResourceProducerLabels[flatIndex].text = string.Empty;
+                    ResourceProducerLabels[flatIndex].color = NeutralMarketColor;
                 }
 
                 ConfigureTooltip(ResourceProducerTooltips[flatIndex], string.Empty);
@@ -386,7 +398,8 @@ namespace Civic.UI
                         button,
                         buttonTooltip,
                         false,
-                        null);
+                        null,
+                        NeutralMarketColor);
                     continue;
                 }
 
@@ -403,7 +416,8 @@ namespace Civic.UI
                     button,
                     buttonTooltip,
                     true,
-                    building);
+                    building,
+                    GetBuildingMarketTint(snapshot, building));
             }
         }
 
@@ -418,7 +432,8 @@ namespace Civic.UI
             Button button,
             CivicTooltipTrigger buttonTooltip,
             bool visible,
-            CivicBuildingSnapshot building)
+            CivicBuildingSnapshot building,
+            Color marketTint)
         {
             row.SetActive(visible);
             if (!visible || building == null)
@@ -428,6 +443,9 @@ namespace Civic.UI
                 costLabel.text = string.Empty;
                 inputOutputLabel.text = string.Empty;
                 gdpDeltaLabel.text = string.Empty;
+                nameLabel.color = NeutralMarketColor;
+                inputOutputLabel.color = NeutralMarketColor;
+                gdpDeltaLabel.color = NeutralMarketColor;
                 button.interactable = false;
                 SetButtonLabel(button, "건설");
                 ConfigureTooltip(inputOutputTooltip, string.Empty);
@@ -436,10 +454,13 @@ namespace Civic.UI
             }
 
             nameLabel.text = building.DisplayNameKo;
+            nameLabel.color = marketTint;
             countLabel.text = building.Count.ToString(CultureInfo.InvariantCulture);
             costLabel.text = building.ConstructionCost.ToShortString();
             inputOutputLabel.text = BuildBuildingDeltaSummary(building.ResourceDeltas, out var deltaTooltip);
+            inputOutputLabel.color = marketTint;
             gdpDeltaLabel.text = FormatSignedNumber(building.GdpDelta);
+            gdpDeltaLabel.color = marketTint;
             button.gameObject.SetActive(true);
             button.interactable = building.CanBuild;
             SetButtonLabel(button, "건설");
@@ -518,7 +539,8 @@ namespace Civic.UI
             {
                 yield return new ResourceDetailFlowEntry(
                     BuildProducerText(resource, producer),
-                    string.Empty);
+                    string.Empty,
+                    GetMarketTint(resource));
             }
 
             foreach (var consumer in resource.Consumers)
@@ -561,6 +583,21 @@ namespace Civic.UI
                 yield return new ResourceDetailFlowEntry(
                     $"소비처: 건설부문 운영비 | -{resource.ConsumedPerSecond.ToShortString()}/s",
                     "건설부문 treasuryCost는 일반 input 컬럼이 아니라 건설부문 운영비 계산에서 국고 소비로 반영됩니다.");
+            }
+
+            if (resource.Id == TreasuryId)
+            {
+                var directIncome = resource.Producers.Aggregate(CivicNumber.Zero, (sum, producer) => sum + producer.AmountPerSecond);
+                var gdpTaxIncome = CivicNumber.ClampMinZero(resource.ProducedPerSecond - directIncome);
+                if (gdpTaxIncome > CivicNumber.Zero)
+                {
+                    var taxRate = snapshot.Gdp > CivicNumber.Zero
+                        ? (gdpTaxIncome / snapshot.Gdp).ToDouble()
+                        : 0d;
+                    yield return new ResourceDetailFlowEntry(
+                        $"수입처: GDP 세금 | +{gdpTaxIncome.ToShortString()}/s",
+                        $"국고 증가량은 직접 국고 생산에 GDP 세금 수입을 더해 계산합니다. 현재 GDP {snapshot.Gdp.ToShortString()} × 세율 {FormatPercent(taxRate)} = {gdpTaxIncome.ToShortString()}/s 입니다.");
+                }
             }
 
             if (resource.Id == ConstructionPowerId && snapshot.Buildings.Any(building => building.IsBuildable && building.ConstructionCost > CivicNumber.Zero))
@@ -632,6 +669,106 @@ namespace Civic.UI
         private static bool IsGdpResource(CivicResourceSnapshot resource)
         {
             return resource.Category == ResourceCategory.Element && resource.Price > CivicNumber.Zero;
+        }
+
+        private static string WrapMarketColor(string text, CivicResourceSnapshot resource)
+        {
+            var tint = GetMarketTint(resource);
+            if (GetMarketTintWeight(resource) <= 0d)
+            {
+                return text;
+            }
+
+            return $"<color=#{ColorUtility.ToHtmlStringRGB(tint)}>{text}</color>";
+        }
+
+        private static Color GetMarketTint(CivicResourceSnapshot resource)
+        {
+            var weight = GetMarketTintWeight(resource);
+            if (weight <= 0d)
+            {
+                return NeutralMarketColor;
+            }
+
+            return Color.Lerp(NeutralMarketColor, GetMarketTargetColor(resource), (float)weight);
+        }
+
+        private static Color GetMarketTargetColor(CivicResourceSnapshot resource)
+        {
+            var demandSupplyRatio = ToDemandSupplyRatio(resource.SupplyDemandRatio);
+            return demandSupplyRatio > ShortageTintStartDemandSupplyRatio
+                ? ShortageMarketColor
+                : SurplusMarketColor;
+        }
+
+        private static double GetMarketTintWeight(CivicResourceSnapshot resource)
+        {
+            if (resource == null || resource.Category != ResourceCategory.Element)
+            {
+                return 0d;
+            }
+
+            var demandSupplyRatio = ToDemandSupplyRatio(resource.SupplyDemandRatio);
+            if (demandSupplyRatio > ShortageTintStartDemandSupplyRatio)
+            {
+                return Clamp01((demandSupplyRatio - ShortageTintStartDemandSupplyRatio) / (ShortageTintFullDemandSupplyRatio - ShortageTintStartDemandSupplyRatio));
+            }
+
+            if (demandSupplyRatio < SurplusTintStartDemandSupplyRatio)
+            {
+                return Clamp01((SurplusTintStartDemandSupplyRatio - demandSupplyRatio) / (SurplusTintStartDemandSupplyRatio - SurplusTintFullDemandSupplyRatio));
+            }
+
+            return 0d;
+        }
+
+        private static double ToDemandSupplyRatio(double supplyDemandRatio)
+        {
+            if (double.IsPositiveInfinity(supplyDemandRatio))
+            {
+                return 0d;
+            }
+
+            if (supplyDemandRatio <= 0d)
+            {
+                return double.PositiveInfinity;
+            }
+
+            return 1d / supplyDemandRatio;
+        }
+
+        private static double Clamp01(double value)
+        {
+            return Math.Max(0d, Math.Min(1d, value));
+        }
+
+        private static string FormatPercent(double value)
+        {
+            return (value * 100d).ToString("0.##", CultureInfo.InvariantCulture) + "%";
+        }
+
+        private static Color GetBuildingMarketTint(CivicGameSnapshot snapshot, CivicBuildingSnapshot building)
+        {
+            if (snapshot == null || building == null)
+            {
+                return NeutralMarketColor;
+            }
+
+            var outputResources = building.ResourceDeltas
+                .Where(delta => delta.AmountPerSecond > CivicNumber.Zero)
+                .Select(delta => FindResource(snapshot, delta.ResourceId))
+                .Where(resource => resource != null && resource.Category == ResourceCategory.Element)
+                .ToArray();
+
+            if (outputResources.Length == 0)
+            {
+                return NeutralMarketColor;
+            }
+
+            var strongest = outputResources
+                .OrderByDescending(GetMarketTintWeight)
+                .First();
+            return GetMarketTint(strongest);
         }
 
         private static string BuildBuildingDeltaSummary(IReadOnlyList<CivicBuildingResourceDeltaSnapshot> deltas, out string tooltip)
@@ -815,13 +952,20 @@ namespace Civic.UI
         private readonly struct ResourceDetailFlowEntry
         {
             public ResourceDetailFlowEntry(string text, string tooltip)
+                : this(text, tooltip, NeutralMarketColor)
+            {
+            }
+
+            public ResourceDetailFlowEntry(string text, string tooltip, Color tint)
             {
                 Text = text;
                 Tooltip = tooltip;
+                Tint = tint;
             }
 
             public string Text { get; }
             public string Tooltip { get; }
+            public Color Tint { get; }
         }
 
         private readonly struct PopulationSourceEntry

@@ -6,9 +6,12 @@ namespace Civic.Simulation
 {
     public sealed class CivicGameState
     {
+        private const double BaseTaxRate = 0.10d;
+
         public CivicGameState(CivicGameData data)
         {
             CurrentEraId = data.StartingEra.Id;
+            TaxRate = BaseTaxRate;
             Resources = data.Resources.ToDictionary(resource => resource.Id, _ => CivicNumber.Zero, StringComparer.Ordinal);
             Buildings = data.Buildings.ToDictionary(building => building.Id, _ => 0, StringComparer.Ordinal);
             ResearchedTechnologyIds = new HashSet<string>(StringComparer.Ordinal);
@@ -290,6 +293,7 @@ namespace Civic.Simulation
                 var basePrice = resource.BasePrice;
                 var priceMultiplier = basePrice > CivicNumber.Zero ? (price / basePrice).ToDouble() : 0d;
                 var supplyRate = rates.SupplyRates.TryGetValue(resource.Id, out var currentSupplyRate) ? currentSupplyRate : 1d;
+                var supplyDemandRatio = CalculateSupplyDemandRatio(rates.Demand[resource.Id], rates.Produced[resource.Id]);
                 resources.Add(new CivicResourceSnapshot(
                     resource.Id,
                     resource.DisplayNameKo,
@@ -304,6 +308,7 @@ namespace Civic.Simulation
                     net,
                     price,
                     priceMultiplier,
+                    supplyDemandRatio,
                     supplyRate,
                     supplyRate < 0.999d));
             }
@@ -483,6 +488,16 @@ namespace Civic.Simulation
             }
 
             return gdp;
+        }
+
+        private static double CalculateSupplyDemandRatio(CivicNumber demand, CivicNumber produced)
+        {
+            if (demand > CivicNumber.Zero)
+            {
+                return (produced / demand).ToDouble();
+            }
+
+            return produced > CivicNumber.Zero ? double.PositiveInfinity : 1d;
         }
 
         private CivicNumber CalculateConstructionTreasurySpend(IReadOnlyDictionary<string, double> buildingEfficiencies)
@@ -776,6 +791,7 @@ namespace Civic.Simulation
             CivicNumber netPerSecond,
             CivicNumber price,
             double priceMultiplier,
+            double supplyDemandRatio,
             double supplyRate,
             bool isShortage)
         {
@@ -792,6 +808,7 @@ namespace Civic.Simulation
             NetPerSecond = netPerSecond;
             Price = price;
             PriceMultiplier = priceMultiplier;
+            SupplyDemandRatio = supplyDemandRatio;
             SupplyRate = supplyRate;
             IsShortage = isShortage;
         }
@@ -809,6 +826,7 @@ namespace Civic.Simulation
         public CivicNumber NetPerSecond { get; }
         public CivicNumber Price { get; }
         public double PriceMultiplier { get; }
+        public double SupplyDemandRatio { get; }
         public double SupplyRate { get; }
         public bool IsShortage { get; }
     }

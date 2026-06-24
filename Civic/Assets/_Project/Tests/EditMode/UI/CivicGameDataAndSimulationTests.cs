@@ -79,6 +79,8 @@ namespace Civic.UI.Tests
         {
             var simulation = new CivicGameSimulation(LoadDefaultData());
 
+            Assert.That(simulation.State.TaxRate, Is.EqualTo(0.10d).Within(0.0001d));
+
             Assert.That(simulation.TryBuild("logging_camp"), Is.True);
             Assert.That(
                 simulation.Snapshot.Buildings.Single(building => building.Id == "logging_camp").Count,
@@ -100,6 +102,7 @@ namespace Civic.UI.Tests
             Assert.That(
                 simulation.Snapshot.Technologies.Single(technology => technology.Id == "woodworking").IsResearched,
                 Is.True);
+            Assert.That(simulation.State.TaxRate, Is.EqualTo(0.11d).Within(0.0001d));
 
             simulation.State.Resources["construction_power"] = CivicNumber.FromDouble(10d);
             Assert.That(simulation.TryBuild("tool_workshop"), Is.True);
@@ -136,9 +139,9 @@ namespace Civic.UI.Tests
             Assert.That(simulation.TryBuild("construction_sector"), Is.True);
 
             var treasury = Resource(simulation.Snapshot, "treasury");
-            Assert.That(treasury.ProducedPerSecond.ToDouble(), Is.EqualTo(1d).Within(0.0001d));
+            Assert.That(treasury.ProducedPerSecond.ToDouble(), Is.EqualTo(1d + simulation.Snapshot.Gdp.ToDouble() * simulation.State.TaxRate).Within(0.0001d));
             Assert.That(treasury.ConsumedPerSecond.ToDouble(), Is.EqualTo(0.5d).Within(0.0001d));
-            Assert.That(treasury.NetPerSecond.ToDouble(), Is.EqualTo(0.5d).Within(0.0001d));
+            Assert.That(treasury.NetPerSecond.ToDouble(), Is.EqualTo(treasury.ProducedPerSecond.ToDouble() - 0.5d).Within(0.0001d));
         }
 
         private static CivicGameData LoadDefaultData()
