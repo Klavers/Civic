@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Compile', 'GenerateUI', 'ValidateUI', 'TestEditMode', 'TestPlayMode')]
+    [ValidateSet('Compile', 'GenerateUI', 'ValidateUI', 'ValidateData', 'TestEditMode', 'TestPlayMode')]
     [string]$Action
 )
 
@@ -42,6 +42,9 @@ switch ($Action) {
     }
     'ValidateUI' {
         $arguments += @('-quit', '-executeMethod', 'Civic.Editor.UI.UiPrefabValidator.ValidateAll')
+    }
+    'ValidateData' {
+        $arguments += @('-quit', '-executeMethod', 'Civic.Editor.UI.CivicDataValidator.ValidateAll')
     }
     'TestEditMode' {
         $resultPath = Join-Path $outputRoot "EditMode-$stamp.xml"

@@ -1,10 +1,7 @@
 {
-  "name": "Civic.UI.Runtime",
-  "rootNamespace": "Civic.UI",
-  "references": [
-    "Civic.Simulation.Runtime",
-    "UnityEngine.UI"
-  ],
+  "name": "Civic.Simulation.Runtime",
+  "rootNamespace": "Civic.Simulation",
+  "references": [],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

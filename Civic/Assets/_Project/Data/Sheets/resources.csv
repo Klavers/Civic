@@ -1,0 +1,10 @@
+id,displayNameKo,category,basePrice,foodConversion,isStockpile,sortOrder
+population,인구,numeric,0,0,true,10
+food,식량,aggregate,0,0,true,20
+wheat,밀,element,1,1,true,21
+wood,나무,element,2,0,true,30
+tools,공구,element,5,0,true,40
+paper,종이,element,6,0,true,50
+science,과학,numeric,0,0,true,60
+treasury,국고,numeric,0,0,true,70
+construction_power,건설력,numeric,0,0,true,80

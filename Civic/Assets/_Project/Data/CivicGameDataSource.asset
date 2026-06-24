@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 16af87b9eccf421b9a1bb0479c53342d, type: 3}
+  m_Name: CivicGameDataSource
+  m_EditorClassIdentifier: 
+  resourcesCsv: {fileID: 4900000, guid: 51a1937b75f8462cbd3de8a3b11eb805, type: 3}
+  buildingsCsv: {fileID: 4900000, guid: 41844334a98d467b83a7dab387a4972a, type: 3}
+  technologiesCsv: {fileID: 4900000, guid: 97aae2ef7d354bd8b185466c00445e38, type: 3}
+  erasCsv: {fileID: 4900000, guid: 53b775a0fdb4443b95c2b01d7f06a60b, type: 3}
+  initialStateCsv: {fileID: 4900000, guid: bd1090477f5c44e8be86d4302c51b129, type: 3}

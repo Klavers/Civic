@@ -12,9 +12,10 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 - Unity 버전 정본: `Civic/ProjectSettings/ProjectVersion.txt`
 - 프로젝트 열기: Unity Hub에서 저장소의 `Civic/` 폴더 선택
-- CLI 래퍼: `powershell -ExecutionPolicy Bypass -File scripts/Invoke-Unity.ps1 -Action <Compile|GenerateUI|ValidateUI|TestEditMode|TestPlayMode>`
+- CLI 래퍼: `powershell -ExecutionPolicy Bypass -File scripts/Invoke-Unity.ps1 -Action <Compile|GenerateUI|ValidateUI|ValidateData|TestEditMode|TestPlayMode>`
 - 열린 Editor에서 UI 생성: `Tools > Civic > UI > Generate`
 - 열린 Editor에서 UI 검증: `Tools > Civic > UI > Validate`
+- 열린 Editor에서 데이터 검증: `Tools > Civic > Data > Validate`
 
 현재 기준선(2026-06-23)은 CLI 생성·검증, EditMode·PlayMode 통과, 열린 Editor에서 Generate 2회 재실행·Validate 대화상자·`SampleScene` 업그레이드 기능 수동 확인까지 완료된 상태다. 이후 UI·씬·생성기 변경은 해당 검증을 다시 수행한다.
 

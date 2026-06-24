@@ -1,0 +1,8 @@
+id,displayNameKo,eraId,role,isBuildable,constructionCost,treasuryCost,populationUse,unlockedByTechnologyId,sortOrder,input1Id,input1Amount,input2Id,input2Amount,input3Id,input3Amount,input4Id,input4Amount,input5Id,input5Amount,output1Id,output1Amount,output2Id,output2Amount,output3Id,output3Amount,output4Id,output4Amount,output5Id,output5Amount
+capital,수도,primitive,capital,false,0,0,0,,10,,,,,,,,,,,wheat,1,wood,1,treasury,1,construction_power,1,,
+logging_camp,벌목장,primitive,production,true,3,0,1,,20,,,,,,,,,,,wood,1,,,,,,,,
+wheat_farm,밀농장,primitive,production,true,3,0,1,,30,,,,,,,,,,,wheat,1,,,,,,,,
+tool_workshop,공구공장,primitive,production,true,5,0,1,woodworking,40,wood,0.5,,,,,,,,,tools,0.25,,,,,,,,
+paper_mill,제지소,primitive,production,true,5,0,1,woodworking,50,wood,0.5,,,,,,,,,paper,0.25,,,,,,,,
+construction_sector,건설부문,primitive,construction,true,5,0.5,1,,60,wood,0.25,,,,,,,,,construction_power,1,,,,,,,,
+hut,오두막,primitive,housing,true,5,0,0,,70,wheat,1,wood,0.5,,,,,,,population,2,,,,,,,,
