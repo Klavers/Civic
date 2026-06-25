@@ -71,6 +71,7 @@ namespace Civic.UI.Tests
 
             Assert.That(controller.Simulation.Snapshot.HasResearchAvailable, Is.True);
 
+            controller.Simulation.State.Resources["science"] = CivicNumber.FromDouble(100d);
             var researchedBefore = controller.Simulation.Snapshot.Technologies.Count(technology => technology.IsResearched);
             controller.View.TechnologiesPanelButton.onClick.Invoke();
             yield return null;
@@ -83,10 +84,44 @@ namespace Civic.UI.Tests
             researchButton.onClick.Invoke();
             yield return null;
 
+            Assert.That(controller.SelectedTechnologyEraId, Is.EqualTo("primitive"));
+            Assert.That(controller.Simulation.Snapshot.CurrentEraId, Is.EqualTo("primitive"));
+
+            researchButton = controller.View.TechnologyActionButtons.First(button => button.gameObject.activeSelf && button.interactable);
+            researchButton.onClick.Invoke();
+            yield return null;
+
             Assert.That(
                 controller.Simulation.Snapshot.Technologies.Count(technology => technology.IsResearched),
                 Is.GreaterThan(researchedBefore));
             Assert.That(controller.View.EraTabLabels.Any(label => label.gameObject.activeInHierarchy && label.text.Contains("고대")), Is.True);
+
+            Assert.That(controller.Simulation.Snapshot.CurrentEraId, Is.EqualTo("primitive"));
+            Assert.That(controller.SelectedTechnologyEraId, Is.EqualTo("primitive"));
+
+            var nextEraTabButton = controller.View.EraTabButtons.First(button => button.gameObject.activeSelf && button.interactable);
+            nextEraTabButton.onClick.Invoke();
+            yield return null;
+
+            Assert.That(controller.SelectedTechnologyEraId, Is.EqualTo("ancient"));
+            researchButton = controller.View.TechnologyActionButtons.First(button => button.gameObject.activeSelf && button.interactable);
+            researchButton.onClick.Invoke();
+            yield return null;
+
+            Assert.That(controller.Simulation.Snapshot.CurrentEraId, Is.EqualTo("ancient"));
+            Assert.That(controller.SelectedTechnologyEraId, Is.EqualTo("ancient"));
+
+            var previousEraTabButton = controller.View.EraTabButtons.First(button => button.gameObject.activeSelf && button.interactable);
+            previousEraTabButton.onClick.Invoke();
+            yield return null;
+
+            Assert.That(controller.SelectedTechnologyEraId, Is.EqualTo("primitive"));
+            researchButton = controller.View.TechnologyActionButtons.First(button => button.gameObject.activeSelf && button.interactable);
+            researchButton.onClick.Invoke();
+            yield return null;
+
+            Assert.That(controller.Simulation.Snapshot.CurrentEraId, Is.EqualTo("ancient"));
+            Assert.That(controller.SelectedTechnologyEraId, Is.EqualTo("primitive"));
 
             Assert.DoesNotThrow(() => controller.View.FoodToggleButton.onClick.Invoke());
             Assert.That(controller.Simulation.Snapshot.Resources.Any(resource => resource.Category == ResourceCategory.Aggregate), Is.True);

@@ -17,6 +17,7 @@ namespace Civic.UI
         public CivicHudView View => view;
         public CivicGameSimulation Simulation => simulation;
         public CivicGameDataSource DataSource => dataSource;
+        public string SelectedTechnologyEraId => selectedTechnologyEraId;
         public bool HasRequiredReferences => view != null && dataSource != null;
 
         private void Awake()
@@ -108,10 +109,7 @@ namespace Civic.UI
 
         private void ResearchRequestedTechnology(string technologyId)
         {
-            if (simulation != null && simulation.TryResearch(technologyId))
-            {
-                selectedTechnologyEraId = simulation.Snapshot.CurrentEraId;
-            }
+            simulation?.TryResearch(technologyId);
 
             Render();
         }

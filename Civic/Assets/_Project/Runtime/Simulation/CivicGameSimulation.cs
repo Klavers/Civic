@@ -7,6 +7,7 @@ namespace Civic.Simulation
     public sealed class CivicGameState
     {
         private const double BaseTaxRate = 0.10d;
+        private const string PopulationId = "population";
 
         public CivicGameState(CivicGameData data)
         {
@@ -14,12 +15,16 @@ namespace Civic.Simulation
             TaxRate = BaseTaxRate;
             Resources = data.Resources.ToDictionary(resource => resource.Id, _ => CivicNumber.Zero, StringComparer.Ordinal);
             Buildings = data.Buildings.ToDictionary(building => building.Id, _ => 0, StringComparer.Ordinal);
-            ResearchedTechnologyIds = new HashSet<string>(StringComparer.Ordinal);
+            ResearchedTechnologyIds = new HashSet<string>(data.InitialState.Technologies, StringComparer.Ordinal);
 
             foreach (var pair in data.InitialState.Resources)
             {
                 Resources[pair.Key] = pair.Value;
             }
+
+            BasePopulation = Resources.TryGetValue(PopulationId, out var population)
+                ? population
+                : CivicNumber.Zero;
 
             foreach (var pair in data.InitialState.Buildings)
             {
@@ -32,6 +37,7 @@ namespace Civic.Simulation
         public HashSet<string> ResearchedTechnologyIds { get; }
         public string CurrentEraId { get; set; }
         public double TaxRate { get; set; }
+        public CivicNumber BasePopulation { get; set; }
     }
 
     public sealed class CivicGameSimulation
@@ -51,7 +57,9 @@ namespace Civic.Simulation
         {
             Data = data ?? throw new ArgumentNullException(nameof(data));
             State = new CivicGameState(data);
+            SetResource(PopulationId, CalculateEffectivePopulation(Array.Empty<CivicPopulationConsumptionSnapshot>()));
             lastSnapshot = CalculateSnapshot();
+            SetResource(PopulationId, lastSnapshot.Population);
         }
 
         public CivicGameData Data { get; }
@@ -75,15 +83,13 @@ namespace Civic.Simulation
             }
 
             tickAccumulatorSeconds -= wholeTicks * TickSeconds;
-            CivicRateSet lastAppliedRates = null;
             for (var tick = 0; tick < wholeTicks; tick++)
             {
                 var rates = CalculateRates();
                 ApplyRates(rates);
-                lastAppliedRates = rates;
             }
 
-            lastSnapshot = CalculateSnapshot(lastAppliedRates);
+            lastSnapshot = CalculateSnapshot();
             return lastSnapshot;
         }
 
@@ -101,11 +107,15 @@ namespace Civic.Simulation
             {
                 foreach (var output in building.Outputs)
                 {
-                    AddResource(output.ResourceId, output.Amount);
+                    if (output.ResourceId != PopulationId)
+                    {
+                        AddResource(output.ResourceId, output.Amount);
+                    }
                 }
             }
 
             lastSnapshot = CalculateSnapshot();
+            SetResource(PopulationId, lastSnapshot.Population);
             return true;
         }
 
@@ -119,12 +129,10 @@ namespace Civic.Simulation
             State.Resources[ScienceId] = State.Resources[ScienceId] - technology.Cost;
             State.ResearchedTechnologyIds.Add(technology.Id);
             State.TaxRate += technology.TaxRateAdd;
-            if (!string.IsNullOrEmpty(technology.UnlocksEraId))
-            {
-                State.CurrentEraId = technology.UnlocksEraId;
-            }
+            AdvanceEraForResearchedTechnology(technology);
 
             lastSnapshot = CalculateSnapshot();
+            SetResource(PopulationId, lastSnapshot.Population);
             return true;
         }
 
@@ -165,7 +173,7 @@ namespace Civic.Simulation
                 return false;
             }
 
-            if (!IsEraAvailable(technology.EraId))
+            if (!IsEraVisible(technology.EraId))
             {
                 return false;
             }
@@ -252,8 +260,6 @@ namespace Civic.Simulation
                 }
             }
 
-            produced[ScienceId] = produced[ScienceId] + GetPopulation();
-
             var prices = CalculatePrices(normalDemand, produced);
             var gdp = CalculateGdp(produced, prices);
             var treasuryIncome = produced[TreasuryId] + gdp * State.TaxRate;
@@ -276,21 +282,23 @@ namespace Civic.Simulation
             foreach (var entry in populationConsumption)
             {
                 consumed[entry.ResourceId] = consumed[entry.ResourceId] + entry.ConsumedAmount;
-                produced[PopulationId] = produced[PopulationId] + entry.ProducedPopulation;
             }
+
+            var effectivePopulation = CalculateEffectivePopulation(populationConsumption);
+            produced[ScienceId] = produced[ScienceId] + effectivePopulation;
 
             prices = CalculatePrices(normalDemand, produced);
             gdp = CalculateGdp(produced, prices);
             treasuryIncome = produced[TreasuryId] + gdp * State.TaxRate;
 
-            return new CivicRateSet(normalDemand, produced, consumed, prices, supplyRates, buildingEfficiencies, populationConsumption, gdp, treasuryIncome, treasurySpend);
+            return new CivicRateSet(normalDemand, produced, consumed, prices, supplyRates, buildingEfficiencies, populationConsumption, effectivePopulation, gdp, treasuryIncome, treasurySpend);
         }
 
         private void ApplyRates(CivicRateSet rates)
         {
             foreach (var resource in Data.Resources)
             {
-                if (resource.Id == TreasuryId)
+                if (resource.Id == TreasuryId || resource.Id == PopulationId)
                 {
                     continue;
                 }
@@ -301,6 +309,7 @@ namespace Civic.Simulation
 
             var treasuryDelta = rates.TreasuryIncome - rates.TreasurySpend;
             SetResource(TreasuryId, CivicNumber.ClampMinZero(GetResource(TreasuryId) + treasuryDelta));
+            SetResource(PopulationId, rates.EffectivePopulation);
         }
 
         private CivicGameSnapshot CalculateSnapshot()
@@ -310,20 +319,29 @@ namespace Civic.Simulation
 
         private CivicGameSnapshot CalculateSnapshot(CivicRateSet rates)
         {
+            SetResource(PopulationId, rates.EffectivePopulation);
             var resources = new List<CivicResourceSnapshot>();
             foreach (var resource in Data.Resources.Where(IsResourceVisible))
             {
-                var stockpile = resource.Id == FoodId ? CalculateFoodStockpile() : GetResource(resource.Id);
+                var stockpile = resource.Id == FoodId
+                    ? CalculateFoodStockpile()
+                    : resource.Id == PopulationId
+                        ? rates.EffectivePopulation
+                        : GetResource(resource.Id);
                 var produced = resource.Id == FoodId
                     ? CalculateFoodProduced(rates.Produced)
-                    : resource.Id == TreasuryId
-                        ? rates.TreasuryIncome
-                        : rates.Produced[resource.Id];
+                    : resource.Id == PopulationId
+                        ? CivicNumber.Zero
+                        : resource.Id == TreasuryId
+                            ? rates.TreasuryIncome
+                            : rates.Produced[resource.Id];
                 var consumed = resource.Id == FoodId
-                    ? CivicNumber.Zero
-                    : resource.Id == TreasuryId
-                        ? rates.TreasurySpend
-                        : rates.Consumed[resource.Id];
+                    ? CalculateFoodConsumed(rates.Consumed)
+                    : resource.Id == PopulationId
+                        ? CivicNumber.Zero
+                        : resource.Id == TreasuryId
+                            ? rates.TreasurySpend
+                            : rates.Consumed[resource.Id];
                 var net = produced - consumed;
                 var price = rates.Prices.TryGetValue(resource.Id, out var currentPrice) ? currentPrice : CivicNumber.Zero;
                 var basePrice = resource.BasePrice;
@@ -355,7 +373,7 @@ namespace Civic.Simulation
                     eraDefinition.Id,
                     eraDefinition.DisplayNameKo,
                     eraDefinition.Order,
-                    IsEraAvailable(eraDefinition.Id),
+                    IsEraVisible(eraDefinition.Id),
                     eraDefinition.Id == State.CurrentEraId))
                 .ToArray();
             var visibleBuildings = Data.Buildings
@@ -370,7 +388,7 @@ namespace Civic.Simulation
                 eras,
                 State.CurrentEraId,
                 currentEra,
-                GetPopulation(),
+                rates.EffectivePopulation,
                 GetUsedPopulation(),
                 rates.Gdp,
                 GetResource(TreasuryId),
@@ -687,6 +705,17 @@ namespace Civic.Simulation
             return food;
         }
 
+        private CivicNumber CalculateFoodConsumed(IReadOnlyDictionary<string, CivicNumber> consumed)
+        {
+            var food = CivicNumber.Zero;
+            foreach (var resource in Data.Resources.Where(resource => resource.Category == ResourceCategory.Element && resource.FoodConversion > 0d && IsResourceUnlocked(resource)))
+            {
+                food += consumed[resource.Id] * resource.FoodConversion;
+            }
+
+            return food;
+        }
+
         private bool IsBuildingUnlocked(BuildingDefinition building)
         {
             return string.IsNullOrEmpty(building.UnlockedByTechnologyId) || State.ResearchedTechnologyIds.Contains(building.UnlockedByTechnologyId);
@@ -704,7 +733,7 @@ namespace Civic.Simulation
             return resource.Category != ResourceCategory.Element || IsResourceUnlocked(resource);
         }
 
-        private bool IsEraAvailable(string eraId)
+        private bool IsEraVisible(string eraId)
         {
             if (!Data.ErasById.TryGetValue(eraId, out var target) ||
                 !Data.ErasById.TryGetValue(State.CurrentEraId, out var current))
@@ -712,7 +741,38 @@ namespace Civic.Simulation
                 return false;
             }
 
-            return target.Order <= current.Order;
+            if (target.Order <= current.Order)
+            {
+                return true;
+            }
+
+            return target.Order == current.Order + 1 && IsHalfOfEraTechnologiesResearched(current.Id);
+        }
+
+        private bool IsHalfOfEraTechnologiesResearched(string eraId)
+        {
+            var technologies = Data.Technologies.Where(technology => technology.EraId == eraId).ToArray();
+            if (technologies.Length == 0)
+            {
+                return false;
+            }
+
+            var researched = technologies.Count(technology => State.ResearchedTechnologyIds.Contains(technology.Id));
+            return researched * 2 >= technologies.Length;
+        }
+
+        private void AdvanceEraForResearchedTechnology(TechnologyDefinition technology)
+        {
+            if (!Data.ErasById.TryGetValue(technology.EraId, out var technologyEra) ||
+                !Data.ErasById.TryGetValue(State.CurrentEraId, out var currentEra))
+            {
+                return;
+            }
+
+            if (technologyEra.Order > currentEra.Order)
+            {
+                State.CurrentEraId = technologyEra.Id;
+            }
         }
 
         private string GetBuildBlockReason(BuildingDefinition building)
@@ -743,6 +803,28 @@ namespace Civic.Simulation
         private CivicNumber GetPopulation()
         {
             return CivicNumber.FromDouble(GetPopulationCount());
+        }
+
+        private CivicNumber CalculateEffectivePopulation(IReadOnlyList<CivicPopulationConsumptionSnapshot> populationConsumption)
+        {
+            var population = CalculateBasePopulation();
+            foreach (var entry in populationConsumption)
+            {
+                population += entry.ProducedPopulation;
+            }
+
+            return CivicNumber.FromDouble(ToNonNegativeInteger(population));
+        }
+
+        private CivicNumber CalculateBasePopulation()
+        {
+            var population = State.BasePopulation;
+            foreach (var building in PopulationProducingBuildings())
+            {
+                population += SumAmounts(building.Outputs, PopulationId) * GetBuildingCount(building);
+            }
+
+            return population;
         }
 
         private bool IsBlockedByPopulationLimit(BuildingDefinition building)
@@ -920,6 +1002,7 @@ namespace Civic.Simulation
             IReadOnlyDictionary<string, double> supplyRates,
             IReadOnlyDictionary<string, double> buildingEfficiencies,
             IReadOnlyList<CivicPopulationConsumptionSnapshot> populationConsumption,
+            CivicNumber effectivePopulation,
             CivicNumber gdp,
             CivicNumber treasuryIncome,
             CivicNumber treasurySpend)
@@ -931,6 +1014,7 @@ namespace Civic.Simulation
             SupplyRates = supplyRates;
             BuildingEfficiencies = buildingEfficiencies;
             PopulationConsumption = populationConsumption;
+            EffectivePopulation = effectivePopulation;
             Gdp = gdp;
             TreasuryIncome = treasuryIncome;
             TreasurySpend = treasurySpend;
@@ -943,6 +1027,7 @@ namespace Civic.Simulation
         public IReadOnlyDictionary<string, double> SupplyRates { get; }
         public IReadOnlyDictionary<string, double> BuildingEfficiencies { get; }
         public IReadOnlyList<CivicPopulationConsumptionSnapshot> PopulationConsumption { get; }
+        public CivicNumber EffectivePopulation { get; }
         public CivicNumber Gdp { get; }
         public CivicNumber TreasuryIncome { get; }
         public CivicNumber TreasurySpend { get; }

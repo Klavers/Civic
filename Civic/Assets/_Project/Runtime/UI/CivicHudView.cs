@@ -625,8 +625,8 @@ namespace Civic.UI
                 foreach (var entry in snapshot.PopulationConsumption)
                 {
                     yield return new ResourceDetailFlowEntry(
-                        $"{entry.BuildingDisplayNameKo} x{entry.BuildingCount} | {entry.ResourceDisplayNameKo} 소비 {entry.ConsumedAmount.ToShortString()} → 인구 +{entry.ProducedPopulation.ToShortString()}/틱",
-                        "인구 생산 건물은 1초 tick마다 해금된 인구층 소비 자원을 자원별로 최대 건물 수만큼 소비하고, 실제 소비량만큼 정수 인구를 추가합니다.");
+                        $"{entry.BuildingDisplayNameKo} x{entry.BuildingCount} | {entry.ResourceDisplayNameKo} 수요 충족 {entry.ConsumedAmount.ToShortString()} → 활성 인구 +{entry.ProducedPopulation.ToShortString()}",
+                        "인구층 소비 자원은 영구 인구를 초당 누적하지 않습니다. 현재 수요가 충족되는 동안만 해당 인구 보너스가 활성화되고, 수요가 미충족되면 보너스가 취소됩니다.");
                 }
             }
 
@@ -675,6 +675,9 @@ namespace Civic.UI
             var population = FindResource(snapshot, PopulationId)?.Stockpile ?? snapshot.Population;
             var sources = new List<PopulationSourceEntry>();
             var attributed = CivicNumber.Zero;
+            var activeBonus = snapshot.PopulationConsumption.Aggregate(
+                CivicNumber.Zero,
+                (sum, entry) => sum + entry.ProducedPopulation);
 
             foreach (var building in snapshot.Buildings)
             {
@@ -696,7 +699,7 @@ namespace Civic.UI
                 attributed += total;
             }
 
-            var basePopulation = CivicNumber.ClampMinZero(population - attributed);
+            var basePopulation = CivicNumber.ClampMinZero(population - attributed - activeBonus);
             if (basePopulation > CivicNumber.Zero)
             {
                 var capital = snapshot.Buildings.FirstOrDefault(building => building.Id == CapitalBuildingId && building.Count > 0);

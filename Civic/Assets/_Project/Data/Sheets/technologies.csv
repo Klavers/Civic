@@ -1,5 +1,5 @@
 id,displayNameKo,eraId,cost,unlocksEraId,prerequisiteTechnologyIds,taxRateAdd,sortOrder
-primitive_agriculture,원시 농경,primitive,3,ancient,,0,10
+primitive_agriculture,원시 농경,primitive,3,,,0,10
 primitive_architecture,원시 건축,primitive,3,,,0,20
 wood_processing,목재 가공,primitive,3,,,0,30
 stone_toolmaking,석기 제작,primitive,3,,,0,40
@@ -9,7 +9,7 @@ fur_processing,털 손질,primitive,3,,,0,70
 storage_methods,저장법,primitive,3,,,0,80
 bone_needle,뼈바늘,primitive,3,,,0,90
 stone_shaping,돌 다듬기,primitive,3,,,0,100
-calendar,달력,ancient,5,classical,,0,110
+calendar,달력,ancient,5,,,0,110
 bronze_smelting,청동 제련,ancient,5,,,0,120
 writing,문자 발명,ancient,5,,,0,130
 urban_planning,도시 계획,ancient,5,,,0,140
