@@ -573,7 +573,7 @@ namespace Civic.UI
         private static string BuildTechnologyActionInfo(CivicTechnologySnapshot technology)
         {
             var state = technology.IsResearched ? "완료" : technology.CanResearch ? "연구 가능" : "대기";
-            return $"{technology.DisplayNameKo} | 비용 {technology.Cost.ToShortString()} | {state}";
+            return $"{technology.DisplayNameKo} | 비용 {technology.Cost.ToShortString()} | {state}\n{technology.EffectSummary}";
         }
 
         private static string BuildResourceSummary(CivicResourceSnapshot resource)
@@ -679,23 +679,17 @@ namespace Civic.UI
                 CivicNumber.Zero,
                 (sum, entry) => sum + entry.ProducedPopulation);
 
-            foreach (var building in snapshot.Buildings)
+            var populationResource = FindResource(snapshot, PopulationId);
+            foreach (var group in (populationResource?.Producers ?? Array.Empty<CivicResourceFlowSnapshot>())
+                .GroupBy(producer => new { producer.BuildingDisplayNameKo, producer.BuildingCount }))
             {
-                if (building.Count <= 0)
-                {
-                    continue;
-                }
-
-                var perBuildingPopulation = building.ResourceDeltas
-                    .Where(delta => delta.ResourceId == PopulationId && delta.AmountPerSecond > CivicNumber.Zero)
-                    .Aggregate(CivicNumber.Zero, (sum, delta) => sum + delta.AmountPerSecond);
-                var total = perBuildingPopulation * building.Count;
+                var total = group.Aggregate(CivicNumber.Zero, (sum, producer) => sum + producer.AmountPerSecond);
                 if (total <= CivicNumber.Zero)
                 {
                     continue;
                 }
 
-                sources.Add(new PopulationSourceEntry(building.DisplayNameKo, building.Count, total));
+                sources.Add(new PopulationSourceEntry(group.Key.BuildingDisplayNameKo, group.Key.BuildingCount, total));
                 attributed += total;
             }
 
@@ -855,7 +849,7 @@ namespace Civic.UI
             }
 
             var visibleCount = BuildingInputOutputVisibleItems - 1;
-            return string.Join(", ", entries.Take(visibleCount)) + $", +{entries.Length - visibleCount}";
+            return string.Join(", ", entries.Take(visibleCount)) + $", 외 {entries.Length - visibleCount} 항목";
         }
 
         private static string FormatResourceDelta(CivicBuildingResourceDeltaSnapshot delta)

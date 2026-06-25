@@ -57,7 +57,7 @@ namespace Civic.Simulation
         {
             Data = data ?? throw new ArgumentNullException(nameof(data));
             State = new CivicGameState(data);
-            SetResource(PopulationId, CalculateEffectivePopulation(Array.Empty<CivicPopulationConsumptionSnapshot>()));
+            SetResource(PopulationId, CalculateEffectivePopulation(Array.Empty<CivicPopulationConsumptionSnapshot>(), CivicNumber.Zero));
             lastSnapshot = CalculateSnapshot();
             SetResource(PopulationId, lastSnapshot.Population);
         }
@@ -128,7 +128,7 @@ namespace Civic.Simulation
 
             State.Resources[ScienceId] = State.Resources[ScienceId] - technology.Cost;
             State.ResearchedTechnologyIds.Add(technology.Id);
-            State.TaxRate += technology.TaxRateAdd;
+            State.TaxRate += CalculateTaxRateAdd(technology.Id);
             AdvanceEraForResearchedTechnology(technology);
 
             lastSnapshot = CalculateSnapshot();
@@ -211,6 +211,7 @@ namespace Civic.Simulation
         {
             var normalDemand = EmptyResourceNumberMap();
             var normalOutput = EmptyResourceNumberMap();
+            var activeEffects = ActiveTechnologyEffects().ToArray();
             foreach (var building in ActiveTickBuildings())
             {
                 var count = GetBuildingCount(building);
@@ -222,6 +223,34 @@ namespace Civic.Simulation
                 foreach (var output in building.Outputs)
                 {
                     normalOutput[output.ResourceId] = normalOutput[output.ResourceId] + output.Amount * count;
+                }
+
+                foreach (var effect in activeEffects.Where(effect => effect.TargetBuildingId == building.Id))
+                {
+                    if (effect.EffectType == TechnologyEffectType.OutputAdd)
+                    {
+                        normalOutput[effect.OutputResourceId] = normalOutput[effect.OutputResourceId] + effect.Amount * count;
+                    }
+                    else if (effect.EffectType == TechnologyEffectType.ConditionalOutputAdd)
+                    {
+                        normalDemand[effect.InputResourceId] = normalDemand[effect.InputResourceId] + CivicNumber.FromDouble(count);
+                    }
+                }
+            }
+
+            foreach (var building in ActiveHousingTechnologyEffectBuildings(activeEffects))
+            {
+                var count = GetBuildingCount(building);
+                foreach (var effect in activeEffects.Where(effect => effect.TargetBuildingId == building.Id))
+                {
+                    if (effect.EffectType == TechnologyEffectType.OutputAdd)
+                    {
+                        normalOutput[effect.OutputResourceId] = normalOutput[effect.OutputResourceId] + effect.Amount * count;
+                    }
+                    else if (effect.EffectType == TechnologyEffectType.ConditionalOutputAdd)
+                    {
+                        normalDemand[effect.InputResourceId] = normalDemand[effect.InputResourceId] + CivicNumber.FromDouble(count);
+                    }
                 }
             }
 
@@ -244,6 +273,7 @@ namespace Civic.Simulation
             var produced = EmptyResourceNumberMap();
             var consumed = EmptyResourceNumberMap();
             var buildingEfficiencies = new Dictionary<string, double>(StringComparer.Ordinal);
+            var technologyEffectFlows = new List<CivicTechnologyEffectFlowSnapshot>();
             foreach (var building in ActiveTickBuildings())
             {
                 var efficiency = CalculateMaterialEfficiency(building, supplyRates);
@@ -257,6 +287,58 @@ namespace Civic.Simulation
                 foreach (var output in building.Outputs)
                 {
                     produced[output.ResourceId] = produced[output.ResourceId] + output.Amount * count * efficiency;
+                }
+
+                foreach (var effect in activeEffects.Where(effect => effect.TargetBuildingId == building.Id))
+                {
+                    if (effect.EffectType == TechnologyEffectType.OutputAdd)
+                    {
+                        var amount = effect.Amount * count * efficiency;
+                        produced[effect.OutputResourceId] = produced[effect.OutputResourceId] + amount;
+                        AddTechnologyEffectFlow(technologyEffectFlows, effect, building, count, effect.OutputResourceId, amount, true);
+                    }
+                    else if (effect.EffectType == TechnologyEffectType.ConditionalOutputAdd)
+                    {
+                        var inputSupplyRate = supplyRates.TryGetValue(effect.InputResourceId, out var currentSupplyRate)
+                            ? currentSupplyRate
+                            : 1d;
+                        var effectEfficiency = efficiency * inputSupplyRate;
+                        var consumedAmount = CivicNumber.FromDouble(count) * effectEfficiency;
+                        var producedAmount = effect.Amount * count * effectEfficiency;
+                        consumed[effect.InputResourceId] = consumed[effect.InputResourceId] + consumedAmount;
+                        produced[effect.OutputResourceId] = produced[effect.OutputResourceId] + producedAmount;
+                        AddTechnologyEffectFlow(technologyEffectFlows, effect, building, count, effect.InputResourceId, consumedAmount, false);
+                        AddTechnologyEffectFlow(technologyEffectFlows, effect, building, count, effect.OutputResourceId, producedAmount, true);
+                    }
+                }
+            }
+
+            foreach (var building in ActiveHousingTechnologyEffectBuildings(activeEffects))
+            {
+                const double efficiency = 1d;
+                buildingEfficiencies[building.Id] = efficiency;
+                var count = GetBuildingCount(building);
+                foreach (var effect in activeEffects.Where(effect => effect.TargetBuildingId == building.Id))
+                {
+                    if (effect.EffectType == TechnologyEffectType.OutputAdd)
+                    {
+                        var amount = effect.Amount * count * efficiency;
+                        produced[effect.OutputResourceId] = produced[effect.OutputResourceId] + amount;
+                        AddTechnologyEffectFlow(technologyEffectFlows, effect, building, count, effect.OutputResourceId, amount, true);
+                    }
+                    else if (effect.EffectType == TechnologyEffectType.ConditionalOutputAdd)
+                    {
+                        var inputSupplyRate = supplyRates.TryGetValue(effect.InputResourceId, out var currentSupplyRate)
+                            ? currentSupplyRate
+                            : 1d;
+                        var effectEfficiency = efficiency * inputSupplyRate;
+                        var consumedAmount = CivicNumber.FromDouble(count) * effectEfficiency;
+                        var producedAmount = effect.Amount * count * effectEfficiency;
+                        consumed[effect.InputResourceId] = consumed[effect.InputResourceId] + consumedAmount;
+                        produced[effect.OutputResourceId] = produced[effect.OutputResourceId] + producedAmount;
+                        AddTechnologyEffectFlow(technologyEffectFlows, effect, building, count, effect.InputResourceId, consumedAmount, false);
+                        AddTechnologyEffectFlow(technologyEffectFlows, effect, building, count, effect.OutputResourceId, producedAmount, true);
+                    }
                 }
             }
 
@@ -284,14 +366,17 @@ namespace Civic.Simulation
                 consumed[entry.ResourceId] = consumed[entry.ResourceId] + entry.ConsumedAmount;
             }
 
-            var effectivePopulation = CalculateEffectivePopulation(populationConsumption);
+            var technologyPopulationBonus = technologyEffectFlows
+                .Where(flow => flow.IsOutput && flow.ResourceId == PopulationId)
+                .Aggregate(CivicNumber.Zero, (sum, flow) => sum + flow.AmountPerSecond);
+            var effectivePopulation = CalculateEffectivePopulation(populationConsumption, technologyPopulationBonus);
             produced[ScienceId] = produced[ScienceId] + effectivePopulation;
 
             prices = CalculatePrices(normalDemand, produced);
             gdp = CalculateGdp(produced, prices);
             treasuryIncome = produced[TreasuryId] + gdp * State.TaxRate;
 
-            return new CivicRateSet(normalDemand, produced, consumed, prices, supplyRates, buildingEfficiencies, populationConsumption, effectivePopulation, gdp, treasuryIncome, treasurySpend);
+            return new CivicRateSet(normalDemand, produced, consumed, prices, supplyRates, buildingEfficiencies, technologyEffectFlows, populationConsumption, effectivePopulation, gdp, treasuryIncome, treasurySpend);
         }
 
         private void ApplyRates(CivicRateSet rates)
@@ -446,6 +531,19 @@ namespace Civic.Simulation
                 AddDelta(deltas, order, output.ResourceId, output.Amount);
             }
 
+            foreach (var effect in ActiveTechnologyEffects().Where(effect => effect.TargetBuildingId == building.Id))
+            {
+                if (effect.EffectType == TechnologyEffectType.OutputAdd)
+                {
+                    AddDelta(deltas, order, effect.OutputResourceId, effect.Amount);
+                }
+                else if (effect.EffectType == TechnologyEffectType.ConditionalOutputAdd)
+                {
+                    AddDelta(deltas, order, effect.InputResourceId, CivicNumber.Zero - CivicNumber.One);
+                    AddDelta(deltas, order, effect.OutputResourceId, effect.Amount);
+                }
+            }
+
             return order
                 .Where(resourceId => deltas[resourceId] > CivicNumber.Zero || deltas[resourceId] < CivicNumber.Zero)
                 .Select(resourceId =>
@@ -499,6 +597,15 @@ namespace Civic.Simulation
                     perBuilding * count * efficiency));
             }
 
+            foreach (var flow in rates.TechnologyEffectFlows.Where(flow => flow.ResourceId == resourceId && flow.IsOutput == outputs))
+            {
+                flows.Add(new CivicResourceFlowSnapshot(
+                    flow.BuildingId,
+                    $"{flow.BuildingDisplayNameKo} · {flow.TechnologyDisplayNameKo}",
+                    flow.BuildingCount,
+                    flow.AmountPerSecond));
+            }
+
             if (!outputs)
             {
                 foreach (var entry in rates.PopulationConsumption.Where(entry => entry.ResourceId == resourceId))
@@ -526,6 +633,26 @@ namespace Civic.Simulation
                     consumedDelta += CivicNumber.One;
                 }
 
+                foreach (var effect in ActiveTechnologyEffects().Where(effect => effect.TargetBuildingId == building.Id))
+                {
+                    if (effect.EffectType == TechnologyEffectType.OutputAdd && effect.OutputResourceId == resourceId)
+                    {
+                        producedDelta += effect.Amount;
+                    }
+                    else if (effect.EffectType == TechnologyEffectType.ConditionalOutputAdd)
+                    {
+                        if (effect.InputResourceId == resourceId)
+                        {
+                            consumedDelta += CivicNumber.One;
+                        }
+
+                        if (effect.OutputResourceId == resourceId)
+                        {
+                            producedDelta += effect.Amount;
+                        }
+                    }
+                }
+
                 if (producedDelta <= CivicNumber.Zero && consumedDelta <= CivicNumber.Zero)
                 {
                     continue;
@@ -545,7 +672,14 @@ namespace Civic.Simulation
 
         private CivicTechnologySnapshot BuildTechnologySnapshot(TechnologyDefinition technology)
         {
-            return new CivicTechnologySnapshot(technology.Id, technology.DisplayNameKo, technology.Cost, State.ResearchedTechnologyIds.Contains(technology.Id), CanResearch(technology), technology.EraId);
+            return new CivicTechnologySnapshot(
+                technology.Id,
+                technology.DisplayNameKo,
+                technology.Cost,
+                State.ResearchedTechnologyIds.Contains(technology.Id),
+                CanResearch(technology),
+                technology.EraId,
+                BuildTechnologyEffectSummary(technology.Id));
         }
 
         private Dictionary<string, CivicNumber> CalculatePrices(IReadOnlyDictionary<string, CivicNumber> demand, IReadOnlyDictionary<string, CivicNumber> produced)
@@ -678,6 +812,18 @@ namespace Civic.Simulation
             return Data.Buildings.Where(building => building.Role != BuildingRole.Housing && GetBuildingCount(building) > 0);
         }
 
+        private IEnumerable<BuildingDefinition> ActiveHousingTechnologyEffectBuildings(IReadOnlyCollection<TechnologyEffectDefinition> activeEffects)
+        {
+            var targetBuildingIds = activeEffects
+                .Where(effect => !string.IsNullOrEmpty(effect.TargetBuildingId))
+                .Select(effect => effect.TargetBuildingId)
+                .ToHashSet(StringComparer.Ordinal);
+            return Data.Buildings.Where(building =>
+                building.Role == BuildingRole.Housing &&
+                GetBuildingCount(building) > 0 &&
+                targetBuildingIds.Contains(building.Id));
+        }
+
         private Dictionary<string, CivicNumber> EmptyResourceNumberMap()
         {
             return Data.Resources.ToDictionary(resource => resource.Id, _ => CivicNumber.Zero, StringComparer.Ordinal);
@@ -805,9 +951,11 @@ namespace Civic.Simulation
             return CivicNumber.FromDouble(GetPopulationCount());
         }
 
-        private CivicNumber CalculateEffectivePopulation(IReadOnlyList<CivicPopulationConsumptionSnapshot> populationConsumption)
+        private CivicNumber CalculateEffectivePopulation(
+            IReadOnlyList<CivicPopulationConsumptionSnapshot> populationConsumption,
+            CivicNumber technologyPopulationBonus)
         {
-            var population = CalculateBasePopulation();
+            var population = CalculateBasePopulation() + technologyPopulationBonus;
             foreach (var entry in populationConsumption)
             {
                 population += entry.ProducedPopulation;
@@ -890,6 +1038,104 @@ namespace Civic.Simulation
             }
 
             return total;
+        }
+
+        private IEnumerable<TechnologyEffectDefinition> ActiveTechnologyEffects()
+        {
+            return Data.TechnologyEffects.Where(effect => State.ResearchedTechnologyIds.Contains(effect.TechnologyId));
+        }
+
+        private IEnumerable<TechnologyEffectDefinition> TechnologyEffectsFor(string technologyId)
+        {
+            return Data.TechnologyEffectsByTechnologyId.TryGetValue(technologyId, out var effects)
+                ? effects
+                : Array.Empty<TechnologyEffectDefinition>();
+        }
+
+        private double CalculateTaxRateAdd(string technologyId)
+        {
+            var taxRateAdd = 0d;
+            foreach (var effect in TechnologyEffectsFor(technologyId).Where(effect => effect.EffectType == TechnologyEffectType.TaxRateAdd))
+            {
+                taxRateAdd += effect.Amount.ToDouble();
+            }
+
+            return taxRateAdd;
+        }
+
+        private void AddTechnologyEffectFlow(
+            ICollection<CivicTechnologyEffectFlowSnapshot> flows,
+            TechnologyEffectDefinition effect,
+            BuildingDefinition building,
+            int buildingCount,
+            string resourceId,
+            CivicNumber amount,
+            bool isOutput)
+        {
+            if (amount <= CivicNumber.Zero)
+            {
+                return;
+            }
+
+            var technologyName = Data.TechnologiesById.TryGetValue(effect.TechnologyId, out var technology)
+                ? technology.DisplayNameKo
+                : effect.TechnologyId;
+            var resourceName = Data.ResourcesById.TryGetValue(resourceId, out var resource)
+                ? resource.DisplayNameKo
+                : resourceId;
+            flows.Add(new CivicTechnologyEffectFlowSnapshot(
+                effect.TechnologyId,
+                technologyName,
+                building.Id,
+                building.DisplayNameKo,
+                buildingCount,
+                resourceId,
+                resourceName,
+                amount,
+                isOutput));
+        }
+
+        private string BuildTechnologyEffectSummary(string technologyId)
+        {
+            var summaries = Data.Resources
+                .Where(resource => resource.RequiredTechnologyId == technologyId)
+                .Select(resource => $"자원 {resource.DisplayNameKo} 해금")
+                .Concat(Data.Buildings
+                    .Where(building => building.UnlockedByTechnologyId == technologyId)
+                    .Select(building => $"건물 {building.DisplayNameKo} 해금"))
+                .Concat(TechnologyEffectsFor(technologyId)
+                .Select(FormatTechnologyEffectSummary)
+                .Where(summary => !string.IsNullOrEmpty(summary)))
+                .ToArray();
+            return summaries.Length == 0
+                ? "효과 없음"
+                : string.Join("; ", summaries);
+        }
+
+        private string FormatTechnologyEffectSummary(TechnologyEffectDefinition effect)
+        {
+            if (!string.IsNullOrEmpty(effect.SummaryKo))
+            {
+                return effect.SummaryKo;
+            }
+
+            var buildingName = Data.BuildingsById.TryGetValue(effect.TargetBuildingId, out var building)
+                ? building.DisplayNameKo
+                : effect.TargetBuildingId;
+            var inputName = Data.ResourcesById.TryGetValue(effect.InputResourceId, out var input)
+                ? input.DisplayNameKo
+                : effect.InputResourceId;
+            var outputName = Data.ResourcesById.TryGetValue(effect.OutputResourceId, out var output)
+                ? output.DisplayNameKo
+                : effect.OutputResourceId;
+            return effect.EffectType switch
+            {
+                TechnologyEffectType.OutputAdd => $"{buildingName} {outputName} +{effect.Amount.ToShortString()}/s",
+                TechnologyEffectType.ConditionalOutputAdd => $"{buildingName}: {inputName} 투입 시 {outputName} +{effect.Amount.ToShortString()}/s",
+                TechnologyEffectType.TaxRateAdd => $"세율 +{effect.Amount.ToShortString()}",
+                TechnologyEffectType.PlannedFollowUp => "그룹 효과 후속 구현 예정",
+                _ => string.Empty,
+            };
         }
 
         private void AddPopulationConsumptionDemand(IDictionary<string, CivicNumber> normalDemand)
@@ -1001,6 +1247,7 @@ namespace Civic.Simulation
             IReadOnlyDictionary<string, CivicNumber> prices,
             IReadOnlyDictionary<string, double> supplyRates,
             IReadOnlyDictionary<string, double> buildingEfficiencies,
+            IReadOnlyList<CivicTechnologyEffectFlowSnapshot> technologyEffectFlows,
             IReadOnlyList<CivicPopulationConsumptionSnapshot> populationConsumption,
             CivicNumber effectivePopulation,
             CivicNumber gdp,
@@ -1013,6 +1260,7 @@ namespace Civic.Simulation
             Prices = prices;
             SupplyRates = supplyRates;
             BuildingEfficiencies = buildingEfficiencies;
+            TechnologyEffectFlows = technologyEffectFlows;
             PopulationConsumption = populationConsumption;
             EffectivePopulation = effectivePopulation;
             Gdp = gdp;
@@ -1026,6 +1274,7 @@ namespace Civic.Simulation
         public IReadOnlyDictionary<string, CivicNumber> Prices { get; }
         public IReadOnlyDictionary<string, double> SupplyRates { get; }
         public IReadOnlyDictionary<string, double> BuildingEfficiencies { get; }
+        public IReadOnlyList<CivicTechnologyEffectFlowSnapshot> TechnologyEffectFlows { get; }
         public IReadOnlyList<CivicPopulationConsumptionSnapshot> PopulationConsumption { get; }
         public CivicNumber EffectivePopulation { get; }
         public CivicNumber Gdp { get; }
@@ -1105,6 +1354,41 @@ namespace Civic.Simulation
         public int Order { get; }
         public bool IsVisible { get; }
         public bool IsCurrent { get; }
+    }
+
+    public sealed class CivicTechnologyEffectFlowSnapshot
+    {
+        public CivicTechnologyEffectFlowSnapshot(
+            string technologyId,
+            string technologyDisplayNameKo,
+            string buildingId,
+            string buildingDisplayNameKo,
+            int buildingCount,
+            string resourceId,
+            string resourceDisplayNameKo,
+            CivicNumber amountPerSecond,
+            bool isOutput)
+        {
+            TechnologyId = technologyId;
+            TechnologyDisplayNameKo = technologyDisplayNameKo;
+            BuildingId = buildingId;
+            BuildingDisplayNameKo = buildingDisplayNameKo;
+            BuildingCount = buildingCount;
+            ResourceId = resourceId;
+            ResourceDisplayNameKo = resourceDisplayNameKo;
+            AmountPerSecond = amountPerSecond;
+            IsOutput = isOutput;
+        }
+
+        public string TechnologyId { get; }
+        public string TechnologyDisplayNameKo { get; }
+        public string BuildingId { get; }
+        public string BuildingDisplayNameKo { get; }
+        public int BuildingCount { get; }
+        public string ResourceId { get; }
+        public string ResourceDisplayNameKo { get; }
+        public CivicNumber AmountPerSecond { get; }
+        public bool IsOutput { get; }
     }
 
     public sealed class CivicPopulationConsumptionSnapshot
@@ -1279,7 +1563,7 @@ namespace Civic.Simulation
 
     public sealed class CivicTechnologySnapshot
     {
-        public CivicTechnologySnapshot(string id, string displayNameKo, CivicNumber cost, bool isResearched, bool canResearch, string eraId)
+        public CivicTechnologySnapshot(string id, string displayNameKo, CivicNumber cost, bool isResearched, bool canResearch, string eraId, string effectSummary)
         {
             Id = id;
             DisplayNameKo = displayNameKo;
@@ -1287,6 +1571,7 @@ namespace Civic.Simulation
             IsResearched = isResearched;
             CanResearch = canResearch;
             EraId = eraId;
+            EffectSummary = effectSummary;
         }
 
         public string Id { get; }
@@ -1295,6 +1580,7 @@ namespace Civic.Simulation
         public bool IsResearched { get; }
         public bool CanResearch { get; }
         public string EraId { get; }
+        public string EffectSummary { get; }
     }
 
     public readonly struct CivicResourceProjection

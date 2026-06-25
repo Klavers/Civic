@@ -24,14 +24,30 @@ namespace Civic.UI.Tests
 
             Assert.That(data.ResourcesById.Keys, Does.Contain("food"));
             Assert.That(data.ResourcesById.Keys, Does.Contain("wheat"));
+            Assert.That(data.ResourcesById.Keys, Does.Contain("plastic"));
             Assert.That(data.BuildingsById.Keys, Does.Contain("capital"));
+            Assert.That(data.BuildingsById.Keys, Does.Contain("house"));
             Assert.That(data.TechnologiesById.Keys, Does.Contain("wood_processing"));
+            Assert.That(data.TechnologiesById.Keys, Does.Contain("future_taxation"));
+            Assert.That(data.TechnologyEffects.Any(effect => effect.EffectType == TechnologyEffectType.ConditionalOutputAdd), Is.True);
+            Assert.That(data.TechnologyEffects.Any(effect => effect.EffectType == TechnologyEffectType.TaxRateAdd), Is.True);
+            Assert.That(data.Technologies.All(technology => technology.TaxRateAdd == 0d), Is.True);
+            Assert.That(data.ResourcesById.Keys, Does.Contain("coal"));
+            Assert.That(data.ResourcesById.Keys, Does.Contain("oil"));
+            Assert.That(data.ResourcesById.Keys, Does.Contain("uranium"));
+            Assert.That(data.ResourcesById.Keys, Does.Contain("sulfur"));
+            Assert.That(data.ResourcesById.Keys, Does.Contain("concrete"));
+            Assert.That(data.ResourcesById.Keys, Does.Contain("fertilizer"));
+            Assert.That(data.ResourcesById.Keys, Does.Contain("machine_parts"));
+            Assert.That(data.ResourcesById.Keys, Does.Contain("explosives"));
             Assert.That(data.ErasById.Keys, Does.Contain("primitive"));
             Assert.That(data.ErasById.Keys, Does.Contain("industrial"));
+            Assert.That(data.ErasById.Keys, Does.Contain("future"));
             Assert.That(data.ErasById["primitive"].Order, Is.EqualTo(0));
             Assert.That(data.ResourcesById["food"].Category, Is.EqualTo(ResourceCategory.Aggregate));
             Assert.That(data.ResourcesById["wheat"].FoodConversion, Is.EqualTo(1d));
             Assert.That(data.ResourcesById["meat"].FoodConversion, Is.EqualTo(2d));
+            Assert.That(data.ResourcesById["groceries"].FoodConversion, Is.EqualTo(4d));
             Assert.That(data.ResourcesById["tools"].BasePrice.ToDouble(), Is.EqualTo(1d).Within(0.0001d));
             Assert.That(data.ResourcesById["tools"].IsPopulationConsumption, Is.True);
             Assert.That(data.ResourcesById["tools"].RequiredTechnologyId, Is.EqualTo("stone_toolmaking"));
@@ -97,7 +113,7 @@ namespace Civic.UI.Tests
             Assert.That(simulation.Snapshot.Resources.Any(resource => resource.Id == "tools"), Is.False);
             Assert.That(simulation.Snapshot.Resources.Any(resource => resource.Id == "meat"), Is.False);
             Assert.That(simulation.Snapshot.Buildings.Any(building => building.Id == "logging_camp"), Is.True);
-            Assert.That(simulation.Snapshot.Buildings.Any(building => building.Id == "hut"), Is.True);
+            Assert.That(simulation.Snapshot.Buildings.Any(building => building.Id == "house"), Is.True);
             Assert.That(simulation.Snapshot.Buildings.Any(building => building.Id == "wheat_farm"), Is.True);
 
             simulation.State.Resources["science"] = CivicNumber.FromDouble(100d);
@@ -155,6 +171,7 @@ namespace Civic.UI.Tests
                 source.ResourcesCsv.text,
                 source.BuildingsCsv.text,
                 technologiesCsv,
+                source.TechnologyEffectsCsv.text,
                 source.ErasCsv.text,
                 initialStateCsv);
             var simulation = new CivicGameSimulation(data);
@@ -169,7 +186,7 @@ namespace Civic.UI.Tests
         {
             var simulation = new CivicGameSimulation(LoadDefaultData());
             simulation.State.Buildings["capital"] = 0;
-            simulation.State.Buildings["hut"] = 100;
+            simulation.State.Buildings["house"] = 100;
             simulation.State.Resources["wheat"] = CivicNumber.FromDouble(97d);
             simulation.State.Resources["wood"] = CivicNumber.FromDouble(112d);
             simulation.State.Resources["tools"] = CivicNumber.FromDouble(80d);
@@ -177,7 +194,7 @@ namespace Civic.UI.Tests
 
             simulation.Advance(0.1d);
 
-            Assert.That(simulation.Snapshot.Population.ToDouble(), Is.EqualTo(480d).Within(0.0001d));
+            Assert.That(simulation.Snapshot.Population.ToDouble(), Is.EqualTo(380d).Within(0.0001d));
             Assert.That(
                 simulation.Snapshot.PopulationConsumption.Sum(entry => entry.ProducedPopulation.ToDouble()),
                 Is.EqualTo(277d).Within(0.0001d));
@@ -187,7 +204,7 @@ namespace Civic.UI.Tests
             Assert.That(Resource(simulation.Snapshot, "wheat").Stockpile.ToDouble(), Is.EqualTo(0d).Within(0.0001d));
             Assert.That(Resource(simulation.Snapshot, "wood").Stockpile.ToDouble(), Is.EqualTo(12d).Within(0.0001d));
             Assert.That(Resource(simulation.Snapshot, "tools").Stockpile.ToDouble(), Is.EqualTo(0d).Within(0.0001d));
-            Assert.That(simulation.Snapshot.Population.ToDouble(), Is.EqualTo(215d).Within(0.0001d));
+            Assert.That(simulation.Snapshot.Population.ToDouble(), Is.EqualTo(115d).Within(0.0001d));
             Assert.That(
                 simulation.Snapshot.PopulationConsumption.Sum(entry => entry.ProducedPopulation.ToDouble()),
                 Is.EqualTo(12d).Within(0.0001d));
@@ -197,7 +214,7 @@ namespace Civic.UI.Tests
             simulation.State.Resources["tools"] = CivicNumber.FromDouble(100d);
             simulation.Advance(0.1d);
 
-            Assert.That(simulation.Snapshot.Population.ToDouble(), Is.EqualTo(503d).Within(0.0001d));
+            Assert.That(simulation.Snapshot.Population.ToDouble(), Is.EqualTo(403d).Within(0.0001d));
         }
 
         [Test]
@@ -205,7 +222,7 @@ namespace Civic.UI.Tests
         {
             var simulation = new CivicGameSimulation(LoadDefaultData());
 
-            Assert.That(simulation.TryBuild("hut"), Is.True);
+            Assert.That(simulation.TryBuild("house"), Is.True);
 
             var food = Resource(simulation.Snapshot, "food");
             Assert.That(food.ProducedPerSecond.ToDouble(), Is.EqualTo(1d).Within(0.0001d));
@@ -253,6 +270,70 @@ namespace Civic.UI.Tests
         }
 
         [Test]
+        public void TechnologyOutputAddAffectsProductionGdpAndResourceFlows()
+        {
+            var simulation = new CivicGameSimulation(LoadDefaultData());
+            simulation.State.Buildings["capital"] = 0;
+            simulation.State.Buildings["wheat_farm"] = 1;
+            simulation.State.ResearchedTechnologyIds.Add("storage_methods");
+
+            simulation.Advance(0.1d);
+
+            var wheat = Resource(simulation.Snapshot, "wheat");
+            Assert.That(wheat.ProducedPerSecond.ToDouble(), Is.EqualTo(2d).Within(0.0001d));
+            Assert.That(wheat.Producers.Any(flow => flow.BuildingDisplayNameKo.Contains("저장법")), Is.True);
+            Assert.That(wheat.Producers.Sum(flow => flow.AmountPerSecond.ToDouble()), Is.EqualTo(2d).Within(0.0001d));
+            Assert.That(simulation.Snapshot.Gdp.ToDouble(), Is.GreaterThan(0d));
+        }
+
+        [Test]
+        public void ConditionalTechnologyEffectAddsDemandConsumptionAndBonusOutput()
+        {
+            var simulation = new CivicGameSimulation(LoadDefaultData());
+            simulation.State.Buildings["capital"] = 0;
+            simulation.State.Buildings["tool_workshop"] = 1;
+            simulation.State.ResearchedTechnologyIds.Add("stone_toolmaking");
+            simulation.State.ResearchedTechnologyIds.Add("stone_shaping");
+            simulation.State.Resources["wood"] = CivicNumber.FromDouble(100d);
+            simulation.State.Resources["stone"] = CivicNumber.FromDouble(100d);
+
+            simulation.Advance(0.1d);
+
+            var tools = Resource(simulation.Snapshot, "tools");
+            var stone = Resource(simulation.Snapshot, "stone");
+            Assert.That(tools.ProducedPerSecond.ToDouble(), Is.EqualTo(2d).Within(0.0001d));
+            Assert.That(stone.ConsumedPerSecond.ToDouble(), Is.EqualTo(1d).Within(0.0001d));
+            Assert.That(tools.Producers.Any(flow => flow.BuildingDisplayNameKo.Contains("돌 다듬기")), Is.True);
+            Assert.That(stone.Consumers.Any(flow => flow.BuildingDisplayNameKo.Contains("돌 다듬기")), Is.True);
+        }
+
+        [Test]
+        public void PopulationOutputTechnologyEffectContributesToEffectivePopulation()
+        {
+            var simulation = new CivicGameSimulation(LoadDefaultData());
+            simulation.State.Buildings["capital"] = 0;
+            simulation.State.Buildings["house"] = 1;
+            simulation.State.Resources["wheat"] = CivicNumber.Zero;
+            simulation.State.Resources["wood"] = CivicNumber.Zero;
+            simulation.State.ResearchedTechnologyIds.Add("urban_planning");
+
+            simulation.Advance(0.1d);
+
+            Assert.That(simulation.Snapshot.Population.ToDouble(), Is.EqualTo(5d).Within(0.0001d));
+            Assert.That(Resource(simulation.Snapshot, "population").Producers.Any(flow => flow.BuildingDisplayNameKo.Contains("도시 계획")), Is.True);
+        }
+
+        [Test]
+        public void GroupTargetTechnologyEffectsAreResearchableButPlannedFollowUpOnly()
+        {
+            var simulation = new CivicGameSimulation(LoadDefaultData());
+            var powerGrid = simulation.Snapshot.Technologies.Single(technology => technology.Id == "power_grid");
+
+            Assert.That(powerGrid.EffectSummary, Does.Contain("후속 구현 예정"));
+            Assert.That(LoadDefaultData().TechnologyEffects.Single(effect => effect.TechnologyId == "power_grid").EffectType, Is.EqualTo(TechnologyEffectType.PlannedFollowUp));
+        }
+
+        [Test]
         public void PopulationProducingBuildingsCanBuildAtPopulationCap()
         {
             var simulation = new CivicGameSimulation(LoadDefaultData());
@@ -269,11 +350,11 @@ namespace Civic.UI.Tests
                 simulation.Snapshot.Buildings.Single(building => building.Id == "logging_camp").CanBuild,
                 Is.False);
             Assert.That(
-                simulation.Snapshot.Buildings.Single(building => building.Id == "hut").CanBuild,
+                simulation.Snapshot.Buildings.Single(building => building.Id == "house").CanBuild,
                 Is.True);
 
-            Assert.That(simulation.TryBuild("hut"), Is.True);
-            Assert.That(simulation.Snapshot.Population.ToDouble(), Is.EqualTo(7d).Within(0.0001d));
+            Assert.That(simulation.TryBuild("house"), Is.True);
+            Assert.That(simulation.Snapshot.Population.ToDouble(), Is.EqualTo(6d).Within(0.0001d));
         }
 
         [Test]
