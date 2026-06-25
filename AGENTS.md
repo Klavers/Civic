@@ -107,6 +107,7 @@ Unity 프로젝트 고유 규약:
 - **수치 하드코딩 지양.** 결과값을 임의로 하드코딩하기보다 수식·파라미터 조정으로 자연 도달하도록 설계한다. 부득이한 hard-code 값은 후속 재캘리브 대상으로 명시한다.
 - **GitHub issue 기반 작업 트래킹.** 다수 plan 의 진행 상태는 GitHub issue 로 등록·추적한다. 본문에는 목적·근거·수행 방법·관련 문서·우선순위·의존을 기재한다. **체크박스 작성 기준** — PR·이슈 body 의 체크박스는 작성 시점에 실제 수행·검증을 마친 항목만 `[x]`, 미수행 항목은 `[ ]` 로 둔다.
 - **GitHub 조회·PR 작업은 `gh` 우선.** 이슈/PR 본문 확인, 코멘트 작성, PR 목록·상태 조회, PR 생성·수정은 가능한 경우 GitHub MCP/API 보다 `gh` 명령어를 먼저 사용한다. 샌드박스 권한 문제로 실패하면 승인 요청 후 재시도한다.
+- **커밋·PR 문구는 한국어 우선.** 커밋 메시지 제목·본문, PR 제목·본문은 기본적으로 한국어로 작성한다. 명령어, 파일 경로, 로그 마커, 테스트 이름처럼 원문 보존이 필요한 기술 문자열은 그대로 둔다.
 - **한글 GitHub 본문은 UTF-8 파일 경유.** Windows PowerShell 에서 한글 본문을 `stdin` 파이프(`... | gh issue comment --body-file -`)로 넘기면 인코딩이 깨질 수 있다. 한글이 포함된 이슈/PR 본문·코멘트는 반드시 **UTF-8 파일로 저장한 뒤** `gh ... --body-file <path>` 또는 동등한 파일 기반 입력으로 업로드한다. 업로드 전 파일 내용을 검토하고, `stdin` 직접 파이프는 사용하지 않는다.
 
 ## 변경 작업 시 권장 절차
@@ -130,6 +131,7 @@ PR 생성·머지는 skill `pr-workflow` 사용 (`git add .` 차단, base 자동
 | PR 생성·머지 (base 자동 감지, `git add .` 차단) | skill `pr-workflow` |
 | 세션 종료 시 핸드오프 메모 | skill `session-handoff` |
 | PR/Issue/plan 체크박스 구현 검증·갱신 | skill `check-and-verify` |
+| Unity Editor 상태 확인·UI 생성·검증·테스트 절차 | skill `unity-workflow` |
 | plan·design 깊은 검토 (인터뷰식 grilling) | skill `grill-me` / `grill-with-docs` |
 | plan/PRD 를 이슈로 분해 | skill `to-issues` |
 | 대화 맥락을 PRD 로 발행 | skill `to-prd` |

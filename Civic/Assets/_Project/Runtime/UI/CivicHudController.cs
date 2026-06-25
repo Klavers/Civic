@@ -12,10 +12,12 @@ namespace Civic.UI
         private CivicGameSimulation simulation;
         private CivicHudPanelMode panelMode;
         private bool showFoodChildren;
+        private string selectedTechnologyEraId;
 
         public CivicHudView View => view;
         public CivicGameSimulation Simulation => simulation;
         public CivicGameDataSource DataSource => dataSource;
+        public string SelectedTechnologyEraId => selectedTechnologyEraId;
         public bool HasRequiredReferences => view != null && dataSource != null;
 
         private void Awake()
@@ -38,6 +40,7 @@ namespace Civic.UI
             view.TechnologiesPanelRequested += ShowTechnologiesPanel;
             view.BuildRequested += BuildRequestedBuilding;
             view.ResearchRequested += ResearchRequestedTechnology;
+            view.EraTabRequested += SelectTechnologyEra;
             view.FoodToggleRequested += ToggleFoodChildren;
             Render();
         }
@@ -54,6 +57,7 @@ namespace Civic.UI
             view.TechnologiesPanelRequested -= ShowTechnologiesPanel;
             view.BuildRequested -= BuildRequestedBuilding;
             view.ResearchRequested -= ResearchRequestedTechnology;
+            view.EraTabRequested -= SelectTechnologyEra;
             view.FoodToggleRequested -= ToggleFoodChildren;
         }
 
@@ -67,7 +71,8 @@ namespace Civic.UI
         {
             if (simulation != null && view != null)
             {
-                view.Render(simulation.Snapshot, panelMode, showFoodChildren);
+                EnsureSelectedTechnologyEra(simulation.Snapshot);
+                view.Render(simulation.Snapshot, panelMode, showFoodChildren, selectedTechnologyEraId);
             }
         }
 
@@ -107,6 +112,46 @@ namespace Civic.UI
             simulation?.TryResearch(technologyId);
 
             Render();
+        }
+
+        private void SelectTechnologyEra(string eraId)
+        {
+            selectedTechnologyEraId = eraId;
+            Render();
+        }
+
+        private void EnsureSelectedTechnologyEra(CivicGameSnapshot snapshot)
+        {
+            if (snapshot == null)
+            {
+                return;
+            }
+
+            foreach (var era in snapshot.Eras)
+            {
+                if (era.IsVisible && era.Id == selectedTechnologyEraId)
+                {
+                    return;
+                }
+            }
+
+            selectedTechnologyEraId = snapshot.CurrentEraId;
+            foreach (var era in snapshot.Eras)
+            {
+                if (era.IsVisible && era.Id == selectedTechnologyEraId)
+                {
+                    return;
+                }
+            }
+
+            foreach (var era in snapshot.Eras)
+            {
+                if (era.IsVisible)
+                {
+                    selectedTechnologyEraId = era.Id;
+                    return;
+                }
+            }
         }
     }
 }

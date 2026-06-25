@@ -188,6 +188,17 @@ namespace Civic.Editor.UI
                 var resourceRowCount = Math.Max(
                     1,
                     gameData.Resources.Count(resource => resource.Category != ResourceCategory.Aggregate));
+                var buildingRowCount = Math.Max(
+                    1,
+                    gameData.Buildings.Count(building => building.IsBuildable));
+                var eraTabCount = Math.Max(1, gameData.Eras.Count);
+                var technologyRowCount = Math.Max(
+                    1,
+                    gameData.Technologies
+                        .GroupBy(technology => technology.EraId)
+                        .Select(group => group.Count())
+                        .DefaultIfEmpty(1)
+                        .Max());
 
                 var resourcePanel = GetOrCreateChild(detailPanel.transform, "ResourceDetailPanel", typeof(RectTransform));
                 SetStretchRect(resourcePanel.GetComponent<RectTransform>(), 16f, 86f, 16f, 18f);
@@ -197,13 +208,14 @@ namespace Civic.Editor.UI
                 var buildingPanel = GetOrCreateChild(detailPanel.transform, "BuildingDetailPanel", typeof(RectTransform));
                 SetStretchRect(buildingPanel.GetComponent<RectTransform>(), 16f, 86f, 16f, 18f);
                 CreateBuildingHeaderRow(buildingPanel.transform);
-                var buildingScroll = CreateScrollArea(buildingPanel.transform, "BuildingScroll", 8 * 56f, 42f);
-                var buildingActionRows = CreateBuildingActionRows(buildingScroll.Content, tooltipView, 8);
+                var buildingScroll = CreateScrollArea(buildingPanel.transform, "BuildingScroll", buildingRowCount * 56f, 42f);
+                var buildingActionRows = CreateBuildingActionRows(buildingScroll.Content, tooltipView, buildingRowCount);
 
                 var technologyPanel = GetOrCreateChild(detailPanel.transform, "TechnologyDetailPanel", typeof(RectTransform));
                 SetStretchRect(technologyPanel.GetComponent<RectTransform>(), 16f, 86f, 16f, 18f);
-                var technologyScroll = CreateScrollArea(technologyPanel.transform, "TechnologyScroll", 8 * 64f);
-                var technologyActionRows = CreateDetailActionRows(technologyScroll.Content, "TechnologyActionRow", "TechnologyInfoLabel", "TechnologyResearchButton", "기술 정보", "연구", 8);
+                var eraTabs = CreateEraTabRows(technologyPanel.transform, eraTabCount);
+                var technologyScroll = CreateScrollArea(technologyPanel.transform, "TechnologyScroll", technologyRowCount * 64f, 52f);
+                var technologyActionRows = CreateDetailActionRows(technologyScroll.Content, "TechnologyActionRow", "TechnologyInfoLabel", "TechnologyResearchButton", "기술 정보", "연구", technologyRowCount);
 
                 var rightPanel = GetOrCreateChild(root.transform, "RightResourcePanel", typeof(RectTransform), typeof(Image));
                 SetRect(rightPanel.GetComponent<RectTransform>(), new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-190f, -36f), new Vector2(360f, -140f));
@@ -250,6 +262,9 @@ namespace Civic.Editor.UI
                 AssignObjectArray(viewObject, "buildingGdpDeltaLabels", buildingActionRows.GdpDeltaLabels);
                 AssignObjectArray(viewObject, "buildingActionButtons", buildingActionRows.Buttons);
                 AssignObjectArray(viewObject, "buildingButtonTooltips", buildingActionRows.ButtonTooltips);
+                AssignObjectArray(viewObject, "eraTabRows", eraTabs.Rows);
+                AssignObjectArray(viewObject, "eraTabLabels", eraTabs.InfoLabels);
+                AssignObjectArray(viewObject, "eraTabButtons", eraTabs.Buttons);
                 AssignObjectArray(viewObject, "technologyActionRows", technologyActionRows.Rows);
                 AssignObjectArray(viewObject, "technologyActionInfoLabels", technologyActionRows.InfoLabels);
                 AssignObjectArray(viewObject, "technologyActionButtons", technologyActionRows.Buttons);
@@ -539,6 +554,42 @@ namespace Civic.Editor.UI
             return tooltip;
         }
 
+        private static DetailActionRows CreateEraTabRows(Transform parent, int count)
+        {
+            var rows = new GameObject[count];
+            var labels = new Text[count];
+            var buttons = new Button[count];
+            for (var index = 0; index < count; index++)
+            {
+                var row = GetOrCreateChild(parent, $"EraTabRow{index + 1:00}", typeof(RectTransform));
+                var width = 112f;
+                SetRect(
+                    row.GetComponent<RectTransform>(),
+                    new Vector2(0f, 1f),
+                    new Vector2(0f, 1f),
+                    new Vector2(58f + index * (width + 8f), -24f),
+                    new Vector2(width, 38f));
+
+                var button = GetOrCreateButton(row.transform, $"EraTabButton{index + 1:00}");
+                SetRect(button.GetComponent<RectTransform>(), Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+                button.GetComponent<Image>().color = new Color(0.18f, 0.24f, 0.32f, 1f);
+                ConfigureButtonColors(button);
+
+                var label = GetOrCreateText(button.transform, "Label");
+                label.text = "시대";
+                label.fontSize = 15;
+                label.alignment = TextAnchor.MiddleCenter;
+                SetRect(label.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+                row.SetActive(false);
+                rows[index] = row;
+                labels[index] = label;
+                buttons[index] = button;
+            }
+
+            return new DetailActionRows(rows, labels, buttons);
+        }
+
         private static DetailActionRows CreateDetailActionRows(Transform parent, string rowPrefix, string infoName, string buttonPrefix, string defaultInfo, string buttonLabel, int count)
         {
             var rows = new GameObject[count];
@@ -547,12 +598,7 @@ namespace Civic.Editor.UI
             for (var index = 0; index < count; index++)
             {
                 var row = GetOrCreateChild(parent, $"{rowPrefix}{index + 1:00}", typeof(RectTransform), typeof(Image));
-                SetRect(
-                    row.GetComponent<RectTransform>(),
-                    new Vector2(0f, 1f),
-                    new Vector2(1f, 1f),
-                    new Vector2(0f, -118f - index * 64f),
-                    new Vector2(-36f, 56f));
+                SetTopStretchRect(row.GetComponent<RectTransform>(), 0f, index * 64f, 36f, 56f);
                 row.GetComponent<Image>().color = new Color(0.05f, 0.07f, 0.09f, 1f);
 
                 var info = GetOrCreateText(row.transform, infoName);

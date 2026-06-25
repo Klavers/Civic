@@ -29,9 +29,20 @@ namespace Civic.Simulation
         public CivicNumber BasePrice { get; }
         public double FoodConversion { get; }
         public bool IsStockpile { get; }
+        public bool IsPopulationConsumption { get; }
+        public string RequiredTechnologyId { get; }
         public int SortOrder { get; }
 
-        public ResourceDefinition(string id, string displayNameKo, ResourceCategory category, CivicNumber basePrice, double foodConversion, bool isStockpile, int sortOrder)
+        public ResourceDefinition(
+            string id,
+            string displayNameKo,
+            ResourceCategory category,
+            CivicNumber basePrice,
+            double foodConversion,
+            bool isStockpile,
+            bool isPopulationConsumption,
+            string requiredTechnologyId,
+            int sortOrder)
         {
             Id = id;
             DisplayNameKo = displayNameKo;
@@ -39,6 +50,8 @@ namespace Civic.Simulation
             BasePrice = basePrice;
             FoodConversion = foodConversion;
             IsStockpile = isStockpile;
+            IsPopulationConsumption = isPopulationConsumption;
+            RequiredTechnologyId = requiredTechnologyId;
             SortOrder = sortOrder;
         }
     }
@@ -139,14 +152,19 @@ namespace Civic.Simulation
 
     public sealed class CivicInitialState
     {
-        public CivicInitialState(IReadOnlyDictionary<string, CivicNumber> resources, IReadOnlyDictionary<string, int> buildings)
+        public CivicInitialState(
+            IReadOnlyDictionary<string, CivicNumber> resources,
+            IReadOnlyDictionary<string, int> buildings,
+            IReadOnlyCollection<string> technologies)
         {
             Resources = resources;
             Buildings = buildings;
+            Technologies = technologies;
         }
 
         public IReadOnlyDictionary<string, CivicNumber> Resources { get; }
         public IReadOnlyDictionary<string, int> Buildings { get; }
+        public IReadOnlyCollection<string> Technologies { get; }
     }
 
     public sealed class CivicGameData
@@ -224,6 +242,8 @@ namespace Civic.Simulation
                 ParseNumber(row, "basePrice", "resources.csv", errors),
                 ParseDouble(row, "foodConversion", "resources.csv", errors),
                 ParseBool(row, "isStockpile", "resources.csv", errors),
+                ParseBool(row, "isPopulationConsumption", "resources.csv", errors),
+                Optional(row, "requiredTechnologyId"),
                 ParseInt(row, "sortOrder", "resources.csv", errors))).ToList();
         }
 
@@ -273,6 +293,7 @@ namespace Civic.Simulation
             var rows = CivicCsvParser.Parse(csv, errors, "initial_state.csv");
             var resources = new Dictionary<string, CivicNumber>(StringComparer.Ordinal);
             var buildings = new Dictionary<string, int>(StringComparer.Ordinal);
+            var technologies = new HashSet<string>(StringComparer.Ordinal);
             foreach (var row in rows)
             {
                 var kind = Required(row, "kind", "initial_state.csv", errors);
@@ -285,13 +306,23 @@ namespace Civic.Simulation
                 {
                     buildings[id] = ParseInt(row, "amount", "initial_state.csv", errors);
                 }
+                else if (kind == "technology")
+                {
+                    var amount = ParseInt(row, "amount", "initial_state.csv", errors);
+                    if (amount != 1)
+                    {
+                        errors.Add($"initial_state.csv technology {id} amount must be 1.");
+                    }
+
+                    technologies.Add(id);
+                }
                 else
                 {
                     errors.Add($"initial_state.csv has unknown kind '{kind}'.");
                 }
             }
 
-            return new CivicInitialState(resources, buildings);
+            return new CivicInitialState(resources, buildings, technologies);
         }
 
         private static void Validate(
@@ -336,6 +367,14 @@ namespace Civic.Simulation
                 }
             }
 
+            foreach (var resource in resources)
+            {
+                if (!string.IsNullOrEmpty(resource.RequiredTechnologyId))
+                {
+                    RequireReference(technologyIds, resource.RequiredTechnologyId, $"resource {resource.Id} requiredTechnologyId", errors);
+                }
+            }
+
             foreach (var technology in technologies)
             {
                 RequireReference(eraIds, technology.EraId, $"technology {technology.Id} eraId", errors);
@@ -358,6 +397,11 @@ namespace Civic.Simulation
             foreach (var id in initialState.Buildings.Keys)
             {
                 RequireReference(buildingIds, id, $"initial building {id}", errors);
+            }
+
+            foreach (var id in initialState.Technologies)
+            {
+                RequireReference(technologyIds, id, $"initial technology {id}", errors);
             }
         }
 

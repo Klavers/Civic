@@ -3,3 +3,6 @@ resource,population,3
 resource,wheat,5
 resource,construction_power,5
 building,capital,1
+technology,primitive_agriculture,1
+technology,primitive_architecture,1
+technology,wood_processing,1
