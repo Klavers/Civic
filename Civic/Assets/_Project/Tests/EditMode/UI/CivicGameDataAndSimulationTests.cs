@@ -27,6 +27,10 @@ namespace Civic.UI.Tests
             Assert.That(data.ResourcesById.Keys, Does.Contain("plastic"));
             Assert.That(data.BuildingsById.Keys, Does.Contain("capital"));
             Assert.That(data.BuildingsById.Keys, Does.Contain("house"));
+            Assert.That(data.BuildingsById.Keys, Does.Contain("clothing_workshop"));
+            Assert.That(data.BuildingsById.Keys, Does.Contain("paper_mill"));
+            Assert.That(data.BuildingsById.Keys, Does.Not.Contain("textile_factory"));
+            Assert.That(data.BuildingsById.Keys, Does.Not.Contain("print_shop"));
             Assert.That(data.TechnologiesById.Keys, Does.Contain("wood_processing"));
             Assert.That(data.TechnologiesById.Keys, Does.Contain("future_taxation"));
             Assert.That(data.TechnologyEffects.Any(effect => effect.EffectType == TechnologyEffectType.ConditionalOutputAdd), Is.True);
@@ -52,6 +56,8 @@ namespace Civic.UI.Tests
             Assert.That(data.ResourcesById["tools"].IsPopulationConsumption, Is.True);
             Assert.That(data.ResourcesById["tools"].RequiredTechnologyId, Is.EqualTo("stone_toolmaking"));
             Assert.That(data.ResourcesById["stone"].IsPopulationConsumption, Is.False);
+            Assert.That(data.ResourcesById["clothing"].DisplayNameKo, Is.EqualTo("의류"));
+            Assert.That(data.BuildingsById["clothing_workshop"].DisplayNameKo, Is.EqualTo("의류 공방"));
             Assert.That(data.InitialState.Resources["wheat"].ToDouble(), Is.EqualTo(5d).Within(0.0001d));
             Assert.That(data.InitialState.Technologies, Does.Contain("primitive_agriculture"));
             Assert.That(data.InitialState.Technologies, Does.Contain("primitive_architecture"));
@@ -62,6 +68,20 @@ namespace Civic.UI.Tests
             Assert.That(OutputAmount(data.BuildingsById["capital"], "wood"), Is.EqualTo(1d).Within(0.0001d));
             Assert.That(OutputAmount(data.BuildingsById["capital"], "treasury"), Is.EqualTo(1d).Within(0.0001d));
             Assert.That(OutputAmount(data.BuildingsById["capital"], "construction_power"), Is.EqualTo(1d).Within(0.0001d));
+
+            var printingPressEffect = data.TechnologyEffects.Single(effect => effect.TechnologyId == "printing_press");
+            Assert.That(printingPressEffect.EffectType, Is.EqualTo(TechnologyEffectType.OutputAdd));
+            Assert.That(printingPressEffect.TargetBuildingId, Is.EqualTo("paper_mill"));
+            Assert.That(printingPressEffect.OutputResourceId, Is.EqualTo("paper"));
+            Assert.That(printingPressEffect.Amount.ToDouble(), Is.EqualTo(2d).Within(0.0001d));
+
+            var spinningMachineEffect = data.TechnologyEffects.Single(effect => effect.TechnologyId == "spinning_machine");
+            Assert.That(spinningMachineEffect.EffectType, Is.EqualTo(TechnologyEffectType.ConditionalOutputAdd));
+            Assert.That(spinningMachineEffect.TargetBuildingId, Is.EqualTo("clothing_workshop"));
+            Assert.That(spinningMachineEffect.InputResourceId, Is.EqualTo("coal"));
+            Assert.That(spinningMachineEffect.OutputResourceId, Is.EqualTo("clothing"));
+            Assert.That(spinningMachineEffect.Amount.ToDouble(), Is.EqualTo(2d).Within(0.0001d));
+            Assert.That(data.TechnologyEffects.Any(effect => effect.TargetBuildingId == "textile_factory" || effect.TargetBuildingId == "print_shop"), Is.False);
         }
 
         [Test]

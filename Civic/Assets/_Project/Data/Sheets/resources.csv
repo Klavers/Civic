@@ -11,7 +11,7 @@ fabric,직물,element,1,0,true,true,fur_processing,60
 precious_metals,귀금속,element,1,0,true,true,precious_metal_use,70
 herbs,약초,element,1,0,true,true,gathering_knowledge,80
 stone,석재,element,1,0,true,false,stone_shaping,90
-clothing,의복,element,1,0,true,true,bone_needle,100
+clothing,의류,element,1,0,true,true,bone_needle,100
 copper,구리,element,1,0,true,false,bronze_smelting,110
 iron,철,element,1,0,true,false,iron_smelting,120
 coal,석탄,element,1,0,true,true,coal_mining,130

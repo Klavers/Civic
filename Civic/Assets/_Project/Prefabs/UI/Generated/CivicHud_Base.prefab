@@ -3243,8 +3243,6 @@ MonoBehaviour:
   - {fileID: 6194392113074488469}
   - {fileID: 9166794623869476701}
   - {fileID: 4734012575687840444}
-  - {fileID: 6125767973361990210}
-  - {fileID: 7571709587146615085}
   buildingActionInfoLabels:
   - {fileID: 3087715370189988756}
   - {fileID: 2300072894720329389}
@@ -3274,8 +3272,6 @@ MonoBehaviour:
   - {fileID: 6494452037073812080}
   - {fileID: 4854094386439690686}
   - {fileID: 6001066417080941458}
-  - {fileID: 655414695207511871}
-  - {fileID: 3360946176492908197}
   buildingCountLabels:
   - {fileID: 7771492623957829590}
   - {fileID: 1791525635770712694}
@@ -3305,8 +3301,6 @@ MonoBehaviour:
   - {fileID: 5688952559230640958}
   - {fileID: 2398010154331031604}
   - {fileID: 6655263441149269097}
-  - {fileID: 4006392239102147679}
-  - {fileID: 180301525587808174}
   buildingCostLabels:
   - {fileID: 3229985950082858334}
   - {fileID: 8517301379395215308}
@@ -3336,8 +3330,6 @@ MonoBehaviour:
   - {fileID: 8451606685346534520}
   - {fileID: 7492520306706312418}
   - {fileID: 6891408516955617347}
-  - {fileID: 4489908425149311918}
-  - {fileID: 4226373352991971950}
   buildingInputOutputLabels:
   - {fileID: 6201837274111826102}
   - {fileID: 5327126632068732667}
@@ -3367,8 +3359,6 @@ MonoBehaviour:
   - {fileID: 4587594068619172533}
   - {fileID: 6546077873706209873}
   - {fileID: 3165717550148638813}
-  - {fileID: 3195372370413225502}
-  - {fileID: 4434756638735309506}
   buildingInputOutputTooltips:
   - {fileID: 6182403141133014016}
   - {fileID: 7595075272312235616}
@@ -3398,8 +3388,6 @@ MonoBehaviour:
   - {fileID: 1166083539693889835}
   - {fileID: 5567587427166216844}
   - {fileID: 5759588069883606731}
-  - {fileID: 8685364762322099442}
-  - {fileID: 7143242392640277618}
   buildingGdpDeltaLabels:
   - {fileID: 4497087147294146335}
   - {fileID: 5497182860703712011}
@@ -3429,8 +3417,6 @@ MonoBehaviour:
   - {fileID: 2610007016890700216}
   - {fileID: 691140274811073949}
   - {fileID: 6127548217534853283}
-  - {fileID: 3747756701427090661}
-  - {fileID: 4147861842943450301}
   buildingActionButtons:
   - {fileID: 614986496100910390}
   - {fileID: 2691658469929931434}
@@ -3460,8 +3446,6 @@ MonoBehaviour:
   - {fileID: 8822295309716654703}
   - {fileID: 6102789707065626196}
   - {fileID: 8347369380877855147}
-  - {fileID: 2611324851104485638}
-  - {fileID: 2367426132208932586}
   buildingButtonTooltips:
   - {fileID: 1839956376077632557}
   - {fileID: 4582094273738136861}
@@ -3491,8 +3475,6 @@ MonoBehaviour:
   - {fileID: 1860045193459628653}
   - {fileID: 6819176493549158456}
   - {fileID: 1680056427274118654}
-  - {fileID: 2044202305637565335}
-  - {fileID: 3364993592111147225}
   eraTabRows:
   - {fileID: 3921322743354095498}
   - {fileID: 6699509812151336983}
@@ -8000,7 +7982,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 1680}
+  m_SizeDelta: {x: 0, y: 1568}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!1 &1163199874377848636
 GameObject:
