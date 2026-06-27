@@ -214,7 +214,7 @@ namespace Civic.Editor.UI
                 var technologyPanel = GetOrCreateChild(detailPanel.transform, "TechnologyDetailPanel", typeof(RectTransform));
                 SetStretchRect(technologyPanel.GetComponent<RectTransform>(), 16f, 86f, 16f, 18f);
                 var eraTabs = CreateEraTabRows(technologyPanel.transform, eraTabCount);
-                var technologyScroll = CreateScrollArea(technologyPanel.transform, "TechnologyScroll", technologyRowCount * 64f, 52f);
+                var technologyScroll = CreateScrollArea(technologyPanel.transform, "TechnologyScroll", technologyRowCount * 84f, 52f);
                 var technologyActionRows = CreateDetailActionRows(technologyScroll.Content, "TechnologyActionRow", "TechnologyInfoLabel", "TechnologyResearchButton", "기술 정보", "연구", technologyRowCount);
 
                 var rightPanel = GetOrCreateChild(root.transform, "RightResourcePanel", typeof(RectTransform), typeof(Image));
@@ -598,14 +598,14 @@ namespace Civic.Editor.UI
             for (var index = 0; index < count; index++)
             {
                 var row = GetOrCreateChild(parent, $"{rowPrefix}{index + 1:00}", typeof(RectTransform), typeof(Image));
-                SetTopStretchRect(row.GetComponent<RectTransform>(), 0f, index * 64f, 36f, 56f);
+                SetTopStretchRect(row.GetComponent<RectTransform>(), 0f, index * 84f, 36f, 76f);
                 row.GetComponent<Image>().color = new Color(0.05f, 0.07f, 0.09f, 1f);
 
                 var info = GetOrCreateText(row.transform, infoName);
                 info.text = defaultInfo;
-                info.fontSize = 17;
+                info.fontSize = 15;
                 info.alignment = TextAnchor.MiddleLeft;
-                SetRect(info.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(-72f, 0f), new Vector2(-176f, -10f));
+                SetRect(info.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(-72f, 0f), new Vector2(-176f, -12f));
 
                 var button = GetOrCreateButton(row.transform, $"{buttonPrefix}{index + 1:00}");
                 SetRect(

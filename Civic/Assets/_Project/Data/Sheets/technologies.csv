@@ -15,7 +15,7 @@ writing,문자 발명,ancient,5,,,0,130
 urban_planning,도시 계획,ancient,5,,,0,140
 brick_architecture,벽돌 건축,ancient,5,,,0,150
 wheelbarrow,수레,ancient,5,,,0,160
-tax_system,조세 제도,ancient,5,,,0.05,170
+tax_system,조세 제도,ancient,5,,,0,170
 precious_metal_use,귀금속 활용,ancient,5,,,0,180
 irrigation_farming,관개 농업,ancient,5,,,0,190
 bronze_tools,청동 도구,ancient,5,,,0,200
@@ -28,4 +28,86 @@ classical_farming,고전 농법,classical,8,,,0,260
 glassmaking,유리 제작,classical,8,,,0,270
 artisan_workshop,장인 작업장,classical,8,,,0,280
 papermaking,제지술,classical,8,,,0,290
-regular_taxation,정규 조세,classical,8,,,0.05,300
+regular_taxation,정규 조세,classical,8,,,0,300
+three_field_system,삼포제,medieval,13,,,0,310
+windmill,풍차,medieval,13,,,0,320
+watermill,수차,medieval,13,,,0,330
+guilds,길드,medieval,13,,,0,340
+tailoring,재단술,medieval,13,,,0,350
+stone_housing,석조 주택,medieval,13,,,0,360
+herbalism,약초학,medieval,13,,,0,370
+mine_drainage,광산 배수,medieval,13,,,0,380
+fortification_architecture,성곽 건축,medieval,13,,,0,390
+ledger_accounting,장부 회계,medieval,13,,,0,400
+university,대학,medieval,13,,,0,410
+printing_press,인쇄술,renaissance,21,,,0,420
+double_entry_bookkeeping,복식부기,renaissance,21,,,0,430
+large_ships,대형 선박,renaissance,21,,,0,440
+precision_tools,정밀 공구,renaissance,21,,,0,450
+glass_lenses,유리 렌즈,renaissance,21,,,0,460
+gunpowder_manufacturing,화약 제조,renaissance,21,,,0,470
+sulfur_mining,유황 채굴,renaissance,21,,,0,480
+anatomy,해부학,renaissance,21,,,0,490
+commercial_farming,상업 농장,renaissance,21,,,0,500
+luxury_furniture,고급 가구,renaissance,21,,,0,510
+loom,직조기,renaissance,21,,,0,520
+coal_mining,석탄 채굴,industrial,34,,,0,530
+steam_engine,증기기관,industrial,34,,,0,540
+factory_system,공장제,industrial,34,,,0,550
+spinning_machine,방직기,industrial,34,,,0,560
+flour_factory,제분 공장,industrial,34,,,0,570
+concrete,콘크리트,industrial,34,,,0,580
+railroad,철도,industrial,34,,,0,590
+fertilizer_chemistry,비료 화학,industrial,34,,,0,600
+dynamite,다이너마이트,industrial,34,,,0,610
+modern_hospital,근대 병원,industrial,34,,,0,620
+mass_taxation,대량 조세,industrial,34,,,0,630
+steel_equipment,강철 설비,industrial,34,,,0,640
+copper_wire,구리 전선,electric,55,,,0,650
+generator,발전기,electric,55,,,0,660
+power_grid,전력망,electric,55,,,0,670
+electric_lights,전등,electric,55,,,0,680
+internal_combustion,내연기관,electric,55,,,0,690
+auto_parts,자동차 부품,electric,55,,,0,700
+synthetic_fertilizer,합성 비료,electric,55,,,0,710
+cold_storage,냉장 창고,electric,55,,,0,720
+electric_weaving,전기 방직,electric,55,,,0,730
+electric_assembly,전기 조립,electric,55,,,0,740
+modern_taxation,근대 세무,electric,55,,,0,750
+pharmaceutical_equipment,제약 설비,electric,55,,,0,760
+petrochemistry,석유화학,modern,89,,,0,770
+plastic_container,플라스틱 용기,modern,89,,,0,780
+synthetic_fiber,합성섬유,modern,89,,,0,790
+modern_clothing,현대 의류,modern,89,,,0,800
+automation_equipment,자동화 설비,modern,89,,,0,810
+nuclear_power,원자력,modern,89,,,0,820
+high_performance_concrete,고성능 콘크리트,modern,89,,,0,830
+synthetic_medicine,합성 약품,modern,89,,,0,840
+precision_glass,정밀 유리,modern,89,,,0,850
+packaged_furniture,포장 가구,modern,89,,,0,860
+modern_administration,현대 행정,modern,89,,,0,870
+large_mines,대형 광산,modern,89,,,0,880
+semiconductor_equipment,반도체 장비,information,144,,,0,890
+automated_logistics,자동 물류,information,144,,,0,900
+precision_agriculture,정밀 농업,information,144,,,0,910
+biomedicine,바이오 의약,information,144,,,0,920
+smart_factory,스마트 공장,information,144,,,0,930
+synthetic_food,합성 식품,information,144,,,0,940
+carbon_materials,탄소 소재,information,144,,,0,950
+advanced_appliances,고급 가전,information,144,,,0,960
+data_taxation,데이터 세무,information,144,,,0,970
+automated_mining,자동 채굴,information,144,,,0,980
+smart_clothing,스마트 의류,information,144,,,0,990
+advanced_automation,고도 자동화,information,144,,,0,1000
+fusion_materials,핵융합 소재,future,233,,,0,1010
+nanomanufacturing,나노 제조,future,233,,,0,1020
+ultra_high_strength_concrete,초고강도 콘크리트,future,233,,,0,1030
+artificial_food,인공 식량,future,233,,,0,1040
+fully_automated_mining,완전 자동 채굴,future,233,,,0,1050
+synthetic_clothing,합성 의복,future,233,,,0,1060
+molecular_medicine,분자 약품,future,233,,,0,1070
+autonomous_factory,자율 공장,future,233,,,0,1080
+orbital_construction_materials,궤도 건재,future,233,,,0,1090
+future_taxation,미래 세무,future,233,,,0,1100
+ultra_precision_glass,초정밀 유리,future,233,,,0,1110
+high_density_machinery,고밀도 기계,future,233,,,0,1120

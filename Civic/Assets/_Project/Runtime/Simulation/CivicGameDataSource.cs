@@ -11,12 +11,14 @@ namespace Civic.Simulation
         [SerializeField] private TextAsset resourcesCsv;
         [SerializeField] private TextAsset buildingsCsv;
         [SerializeField] private TextAsset technologiesCsv;
+        [SerializeField] private TextAsset technologyEffectsCsv;
         [SerializeField] private TextAsset erasCsv;
         [SerializeField] private TextAsset initialStateCsv;
 
         public TextAsset ResourcesCsv => resourcesCsv;
         public TextAsset BuildingsCsv => buildingsCsv;
         public TextAsset TechnologiesCsv => technologiesCsv;
+        public TextAsset TechnologyEffectsCsv => technologyEffectsCsv;
         public TextAsset ErasCsv => erasCsv;
         public TextAsset InitialStateCsv => initialStateCsv;
 
@@ -26,6 +28,7 @@ namespace Civic.Simulation
                 RequireText(resourcesCsv, "resourcesCsv"),
                 RequireText(buildingsCsv, "buildingsCsv"),
                 RequireText(technologiesCsv, "technologiesCsv"),
+                RequireText(technologyEffectsCsv, "technologyEffectsCsv"),
                 RequireText(erasCsv, "erasCsv"),
                 RequireText(initialStateCsv, "initialStateCsv"));
         }

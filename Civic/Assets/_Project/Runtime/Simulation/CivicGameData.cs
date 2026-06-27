@@ -21,6 +21,14 @@ namespace Civic.Simulation
         Housing,
     }
 
+    public enum TechnologyEffectType
+    {
+        OutputAdd,
+        ConditionalOutputAdd,
+        TaxRateAdd,
+        PlannedFollowUp,
+    }
+
     public sealed class ResourceDefinition
     {
         public string Id { get; }
@@ -136,6 +144,38 @@ namespace Civic.Simulation
         public int SortOrder { get; }
     }
 
+    public sealed class TechnologyEffectDefinition
+    {
+        public TechnologyEffectDefinition(
+            string technologyId,
+            TechnologyEffectType effectType,
+            string targetBuildingId,
+            string targetGroupId,
+            string inputResourceId,
+            string outputResourceId,
+            CivicNumber amount,
+            string summaryKo)
+        {
+            TechnologyId = technologyId;
+            EffectType = effectType;
+            TargetBuildingId = targetBuildingId;
+            TargetGroupId = targetGroupId;
+            InputResourceId = inputResourceId;
+            OutputResourceId = outputResourceId;
+            Amount = amount;
+            SummaryKo = summaryKo;
+        }
+
+        public string TechnologyId { get; }
+        public TechnologyEffectType EffectType { get; }
+        public string TargetBuildingId { get; }
+        public string TargetGroupId { get; }
+        public string InputResourceId { get; }
+        public string OutputResourceId { get; }
+        public CivicNumber Amount { get; }
+        public string SummaryKo { get; }
+    }
+
     public sealed class EraDefinition
     {
         public EraDefinition(string id, string displayNameKo, int order)
@@ -173,28 +213,35 @@ namespace Civic.Simulation
             IReadOnlyList<ResourceDefinition> resources,
             IReadOnlyList<BuildingDefinition> buildings,
             IReadOnlyList<TechnologyDefinition> technologies,
+            IReadOnlyList<TechnologyEffectDefinition> technologyEffects,
             IReadOnlyList<EraDefinition> eras,
             CivicInitialState initialState)
         {
             Resources = resources.OrderBy(resource => resource.SortOrder).ToArray();
             Buildings = buildings.OrderBy(building => building.SortOrder).ToArray();
             Technologies = technologies.OrderBy(technology => technology.SortOrder).ToArray();
+            TechnologyEffects = technologyEffects.ToArray();
             Eras = eras.OrderBy(era => era.Order).ToArray();
             InitialState = initialState;
             ResourcesById = Resources.ToDictionary(resource => resource.Id, StringComparer.Ordinal);
             BuildingsById = Buildings.ToDictionary(building => building.Id, StringComparer.Ordinal);
             TechnologiesById = Technologies.ToDictionary(technology => technology.Id, StringComparer.Ordinal);
+            TechnologyEffectsByTechnologyId = TechnologyEffects
+                .GroupBy(effect => effect.TechnologyId, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => (IReadOnlyList<TechnologyEffectDefinition>)group.ToArray(), StringComparer.Ordinal);
             ErasById = Eras.ToDictionary(era => era.Id, StringComparer.Ordinal);
         }
 
         public IReadOnlyList<ResourceDefinition> Resources { get; }
         public IReadOnlyList<BuildingDefinition> Buildings { get; }
         public IReadOnlyList<TechnologyDefinition> Technologies { get; }
+        public IReadOnlyList<TechnologyEffectDefinition> TechnologyEffects { get; }
         public IReadOnlyList<EraDefinition> Eras { get; }
         public CivicInitialState InitialState { get; }
         public IReadOnlyDictionary<string, ResourceDefinition> ResourcesById { get; }
         public IReadOnlyDictionary<string, BuildingDefinition> BuildingsById { get; }
         public IReadOnlyDictionary<string, TechnologyDefinition> TechnologiesById { get; }
+        public IReadOnlyDictionary<string, IReadOnlyList<TechnologyEffectDefinition>> TechnologyEffectsByTechnologyId { get; }
         public IReadOnlyDictionary<string, EraDefinition> ErasById { get; }
 
         public EraDefinition StartingEra => Eras.OrderBy(era => era.Order).First();
@@ -213,23 +260,24 @@ namespace Civic.Simulation
 
     public static class CivicGameDataLoader
     {
-        public static CivicGameData Load(string resourcesCsv, string buildingsCsv, string technologiesCsv, string erasCsv, string initialStateCsv)
+        public static CivicGameData Load(string resourcesCsv, string buildingsCsv, string technologiesCsv, string technologyEffectsCsv, string erasCsv, string initialStateCsv)
         {
             var errors = new List<string>();
             var resources = LoadResources(resourcesCsv, errors);
             var eras = LoadEras(erasCsv, errors);
             var technologies = LoadTechnologies(technologiesCsv, errors);
+            var technologyEffects = LoadTechnologyEffects(technologyEffectsCsv, errors);
             var buildings = LoadBuildings(buildingsCsv, errors);
             var initialState = LoadInitialState(initialStateCsv, errors);
 
-            Validate(resources, buildings, technologies, eras, initialState, errors);
+            Validate(resources, buildings, technologies, technologyEffects, eras, initialState, errors);
 
             if (errors.Count > 0)
             {
                 throw new CivicDataException(errors);
             }
 
-            return new CivicGameData(resources, buildings, technologies, eras, initialState);
+            return new CivicGameData(resources, buildings, technologies, technologyEffects, eras, initialState);
         }
 
         private static List<ResourceDefinition> LoadResources(string csv, ICollection<string> errors)
@@ -277,6 +325,20 @@ namespace Civic.Simulation
                 SplitIds(Optional(row, "prerequisiteTechnologyIds")),
                 ParseDouble(row, "taxRateAdd", "technologies.csv", errors),
                 ParseInt(row, "sortOrder", "technologies.csv", errors))).ToList();
+        }
+
+        private static List<TechnologyEffectDefinition> LoadTechnologyEffects(string csv, ICollection<string> errors)
+        {
+            var rows = CivicCsvParser.Parse(csv, errors, "technology_effects.csv");
+            return rows.Select(row => new TechnologyEffectDefinition(
+                Required(row, "technologyId", "technology_effects.csv", errors),
+                ParseEnum<TechnologyEffectType>(Required(row, "effectType", "technology_effects.csv", errors), "technology_effects.csv", errors),
+                Optional(row, "targetBuildingId"),
+                Optional(row, "targetGroupId"),
+                Optional(row, "inputResourceId"),
+                Optional(row, "outputResourceId"),
+                ParseNumber(row, "amount", "technology_effects.csv", errors),
+                Optional(row, "summaryKo"))).ToList();
         }
 
         private static List<EraDefinition> LoadEras(string csv, ICollection<string> errors)
@@ -329,6 +391,7 @@ namespace Civic.Simulation
             IReadOnlyList<ResourceDefinition> resources,
             IReadOnlyList<BuildingDefinition> buildings,
             IReadOnlyList<TechnologyDefinition> technologies,
+            IReadOnlyList<TechnologyEffectDefinition> technologyEffects,
             IReadOnlyList<EraDefinition> eras,
             CivicInitialState initialState,
             ICollection<string> errors)
@@ -378,6 +441,11 @@ namespace Civic.Simulation
             foreach (var technology in technologies)
             {
                 RequireReference(eraIds, technology.EraId, $"technology {technology.Id} eraId", errors);
+                if (technology.TaxRateAdd != 0d)
+                {
+                    errors.Add($"technology {technology.Id} taxRateAdd must be 0. Use technology_effects.csv taxRateAdd instead.");
+                }
+
                 if (!string.IsNullOrEmpty(technology.UnlocksEraId))
                 {
                     RequireReference(eraIds, technology.UnlocksEraId, $"technology {technology.Id} unlocksEraId", errors);
@@ -386,6 +454,41 @@ namespace Civic.Simulation
                 foreach (var prerequisite in technology.PrerequisiteTechnologyIds)
                 {
                     RequireReference(technologyIds, prerequisite, $"technology {technology.Id} prerequisiteTechnologyIds", errors);
+                }
+            }
+
+            foreach (var effect in technologyEffects)
+            {
+                RequireReference(technologyIds, effect.TechnologyId, $"technology effect {effect.TechnologyId} technologyId", errors);
+                if (effect.Amount < CivicNumber.Zero)
+                {
+                    errors.Add($"technology effect {effect.TechnologyId} amount must be non-negative.");
+                }
+
+                switch (effect.EffectType)
+                {
+                    case TechnologyEffectType.OutputAdd:
+                        RequireReference(buildingIds, effect.TargetBuildingId, $"technology effect {effect.TechnologyId} targetBuildingId", errors);
+                        RequireReference(resourceIds, effect.OutputResourceId, $"technology effect {effect.TechnologyId} outputResourceId", errors);
+                        RequirePositive(effect.Amount, $"technology effect {effect.TechnologyId} amount", errors);
+                        break;
+                    case TechnologyEffectType.ConditionalOutputAdd:
+                        RequireReference(buildingIds, effect.TargetBuildingId, $"technology effect {effect.TechnologyId} targetBuildingId", errors);
+                        RequireReference(resourceIds, effect.InputResourceId, $"technology effect {effect.TechnologyId} inputResourceId", errors);
+                        RequireReference(resourceIds, effect.OutputResourceId, $"technology effect {effect.TechnologyId} outputResourceId", errors);
+                        RequirePositive(effect.Amount, $"technology effect {effect.TechnologyId} amount", errors);
+                        break;
+                    case TechnologyEffectType.TaxRateAdd:
+                        RequireReference(resourceIds, effect.OutputResourceId, $"technology effect {effect.TechnologyId} outputResourceId", errors);
+                        RequirePositive(effect.Amount, $"technology effect {effect.TechnologyId} amount", errors);
+                        break;
+                    case TechnologyEffectType.PlannedFollowUp:
+                        if (string.IsNullOrEmpty(effect.TargetBuildingId) && string.IsNullOrEmpty(effect.TargetGroupId))
+                        {
+                            errors.Add($"technology effect {effect.TechnologyId} plannedFollowUp must have targetBuildingId or targetGroupId.");
+                        }
+
+                        break;
                 }
             }
 
@@ -534,6 +637,14 @@ namespace Civic.Simulation
             if (string.IsNullOrEmpty(id) || !knownIds.Contains(id))
             {
                 errors.Add($"Unknown {label}: {id}");
+            }
+        }
+
+        private static void RequirePositive(CivicNumber value, string label, ICollection<string> errors)
+        {
+            if (value <= CivicNumber.Zero)
+            {
+                errors.Add($"{label} must be greater than 0.");
             }
         }
     }

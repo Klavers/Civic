@@ -15,5 +15,6 @@ MonoBehaviour:
   resourcesCsv: {fileID: 4900000, guid: 51a1937b75f8462cbd3de8a3b11eb805, type: 3}
   buildingsCsv: {fileID: 4900000, guid: 41844334a98d467b83a7dab387a4972a, type: 3}
   technologiesCsv: {fileID: 4900000, guid: 97aae2ef7d354bd8b185466c00445e38, type: 3}
+  technologyEffectsCsv: {fileID: 4900000, guid: d5a497c2ac6f43809b906807a2c736bf, type: 3}
   erasCsv: {fileID: 4900000, guid: 53b775a0fdb4443b95c2b01d7f06a60b, type: 3}
   initialStateCsv: {fileID: 4900000, guid: bd1090477f5c44e8be86d4302c51b129, type: 3}

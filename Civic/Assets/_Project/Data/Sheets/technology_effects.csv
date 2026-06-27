@@ -1,0 +1,128 @@
+technologyId,effectType,targetBuildingId,targetGroupId,inputResourceId,outputResourceId,amount,summaryKo
+fur_processing,outputAdd,pasture,,,fabric,1,목축장 직물 +1/s
+storage_methods,outputAdd,wheat_farm,,,wheat,1,밀농장 밀 +1/s
+stone_shaping,conditionalOutputAdd,tool_workshop,,stone,tools,1,공구공장: 석재 투입 시 공구 +1/s
+calendar,outputAdd,wheat_farm,,,wheat,1,밀농장 밀 +1/s
+writing,outputAdd,house,,,science,1,집 과학 +1/s
+urban_planning,outputAdd,house,,,population,1,집 인구 +1
+brick_architecture,outputAdd,quarry,,,stone,1,채석장 석재 +1/s
+brick_architecture,conditionalOutputAdd,house,,stone,population,1,집: 석재 투입 시 인구 +1
+wheelbarrow,conditionalOutputAdd,wheat_farm,,tools,wheat,1,밀농장: 공구 투입 시 밀 +1/s
+wheelbarrow,conditionalOutputAdd,logging_camp,,tools,wood,1,벌목장: 공구 투입 시 나무 +1/s
+tax_system,taxRateAdd,capital,,,treasury,0.05,세율 +0.05
+irrigation_farming,outputAdd,wheat_farm,,,wheat,1,밀농장 밀 +1/s
+bronze_tools,conditionalOutputAdd,tool_workshop,,copper,tools,1,공구공장: 구리 투입 시 공구 +1/s
+iron_smelting,conditionalOutputAdd,tool_workshop,,iron,tools,1,공구공장: 철 투입 시 공구 +1/s
+iron_tools,conditionalOutputAdd,logging_camp,,tools,wood,1,벌목장: 공구 투입 시 나무 +1/s
+iron_tools,conditionalOutputAdd,quarry,,tools,stone,1,채석장: 공구 투입 시 석재 +1/s
+coinage,outputAdd,gold_mine,,,precious_metals,1,금 광산 귀금속 +1/s
+classical_farming,outputAdd,wheat_farm,,,wheat,1,밀농장 밀 +1/s
+regular_taxation,taxRateAdd,capital,,,treasury,0.05,세율 +0.05
+three_field_system,outputAdd,wheat_farm,,,wheat,1,밀농장 밀 +1/s
+three_field_system,conditionalOutputAdd,pasture,,wheat,meat,1,목축장: 밀 투입 시 고기 +1/s
+three_field_system,conditionalOutputAdd,pasture,,wheat,fabric,1,목축장: 밀 투입 시 직물 +1/s
+watermill,outputAdd,tool_workshop,,,tools,1,공구공장 공구 +1/s
+guilds,conditionalOutputAdd,furniture_workshop,,tools,furniture,1,가구 공방: 공구 투입 시 가구 +1/s
+tailoring,outputAdd,clothing_workshop,,,clothing,1,의류 공방 의류 +1/s
+stone_housing,conditionalOutputAdd,house,,stone,population,1,집: 석재 투입 시 인구 +1
+herbalism,outputAdd,herb_garden,,,herbs,1,약초밭 약초 +1/s
+herbalism,outputAdd,luxury_goods_factory,,,luxury_goods,1,기호품 공장 기호품 +1/s
+mine_drainage,conditionalOutputAdd,copper_mine,,tools,copper,1,구리 광산: 공구 투입 시 구리 +1/s
+mine_drainage,conditionalOutputAdd,gold_mine,,tools,precious_metals,1,금 광산: 공구 투입 시 귀금속 +1/s
+mine_drainage,conditionalOutputAdd,iron_mine,,tools,iron,1,철 광산: 공구 투입 시 철 +1/s
+fortification_architecture,outputAdd,house,,,population,1,집 인구 +1
+ledger_accounting,taxRateAdd,capital,,,treasury,0.05,세율 +0.05
+university,outputAdd,paper_mill,,,paper,1,종이 공방 종이 +1/s
+printing_press,outputAdd,paper_mill,,,paper,2,종이 공방 종이 +2/s
+double_entry_bookkeeping,taxRateAdd,capital,,,treasury,0.05,세율 +0.05
+large_ships,outputAdd,logging_camp,,,wood,1,벌목장 나무 +1/s
+precision_tools,conditionalOutputAdd,tool_workshop,,iron,tools,2,공구공장: 철 투입 시 공구 +2/s
+glass_lenses,outputAdd,glass_workshop,,,glass,1,유리 공방 유리 +1/s
+glass_lenses,conditionalOutputAdd,school,,glass,science,1,학교: 유리 투입 시 과학 +1/s
+anatomy,conditionalOutputAdd,medicine_workshop,,herbs,medicine,1,약품 공방: 약초 투입 시 약품 +1/s
+commercial_farming,outputAdd,wheat_farm,,,wheat,1,밀농장 밀 +1/s
+luxury_furniture,conditionalOutputAdd,furniture_workshop,,wood,furniture,1,가구 공방: 나무 투입 시 가구 +1/s
+luxury_furniture,conditionalOutputAdd,furniture_workshop,,fabric,furniture,1,가구 공방: 직물 투입 시 가구 +1/s
+factory_system,conditionalOutputAdd,tool_workshop,,coal,tools,2,공구공장: 석탄 투입 시 공구 +2/s
+loom,conditionalOutputAdd,clothing_workshop,,tools,clothing,2,의류 공방: 공구 투입 시 의류 +2/s
+spinning_machine,conditionalOutputAdd,clothing_workshop,,coal,clothing,2,의류 공방: 석탄 투입 시 의류 +2/s
+flour_factory,conditionalOutputAdd,groceries_factory,,wheat,groceries,2,식료품 공장: 밀 투입 시 식료품 +2/s
+railroad,conditionalOutputAdd,copper_mine,,machine_parts,copper,2,구리 광산: 기계부품 투입 시 구리 +2/s
+railroad,conditionalOutputAdd,coal_mine,,machine_parts,coal,2,석탄 광산: 기계부품 투입 시 석탄 +2/s
+railroad,conditionalOutputAdd,iron_mine,,machine_parts,iron,2,철 광산: 기계부품 투입 시 철 +2/s
+railroad,conditionalOutputAdd,gold_mine,,machine_parts,precious_metals,2,금 광산: 기계부품 투입 시 귀금속 +2/s
+fertilizer_chemistry,conditionalOutputAdd,wheat_farm,,fertilizer,wheat,2,밀농장: 비료 투입 시 밀 +2/s
+dynamite,conditionalOutputAdd,copper_mine,,explosives,copper,2,구리 광산: 폭약 투입 시 구리 +2/s
+dynamite,conditionalOutputAdd,coal_mine,,explosives,coal,2,석탄 광산: 폭약 투입 시 석탄 +2/s
+dynamite,conditionalOutputAdd,iron_mine,,explosives,iron,2,철 광산: 폭약 투입 시 철 +2/s
+dynamite,conditionalOutputAdd,gold_mine,,explosives,precious_metals,2,금 광산: 폭약 투입 시 귀금속 +2/s
+modern_hospital,outputAdd,medicine_workshop,,,medicine,2,약품 공방 약품 +2/s
+mass_taxation,taxRateAdd,capital,,,treasury,0.05,세율 +0.05
+steel_equipment,conditionalOutputAdd,iron_mine,,coal,iron,2,철 광산: 석탄 투입 시 철 +2/s
+copper_wire,outputAdd,copper_mine,,,copper,2,구리 광산 구리 +2/s
+generator,conditionalOutputAdd,machine_parts_factory,,copper,machine_parts,1,기계부품 공장: 구리 투입 시 기계부품 +1/s
+power_grid,plannedFollowUp,,factories,,,0,공장 계열 석탄 투입 효율 +1은 그룹효과 후속 구현 예정
+electric_lights,outputAdd,glass_workshop,,,glass,1,유리 공방 유리 +1/s
+auto_parts,conditionalOutputAdd,machine_parts_factory,,oil,machine_parts,2,기계부품 공장: 석유 투입 시 기계부품 +2/s
+synthetic_fertilizer,conditionalOutputAdd,fertilizer_factory,,oil,fertilizer,2,비료 공장: 석유 투입 시 비료 +2/s
+synthetic_fertilizer,conditionalOutputAdd,fertilizer_factory,,sulfur,fertilizer,2,비료 공장: 유황 투입 시 비료 +2/s
+cold_storage,outputAdd,groceries_factory,,,groceries,1,식료품 공장 식료품 +1/s
+electric_weaving,conditionalOutputAdd,clothing_workshop,,copper,clothing,2,의류 공방: 구리 투입 시 의류 +2/s
+electric_assembly,conditionalOutputAdd,tool_workshop,,machine_parts,tools,2,공구공장: 기계부품 투입 시 공구 +2/s
+modern_taxation,taxRateAdd,capital,,,treasury,0.04,세율 +0.04
+pharmaceutical_equipment,conditionalOutputAdd,medicine_workshop,,glass,medicine,2,약품 공방: 유리 투입 시 약품 +2/s
+plastic_container,conditionalOutputAdd,groceries_factory,,plastic,groceries,1,식료품 공장: 플라스틱 투입 시 식료품 +1/s
+synthetic_fiber,conditionalOutputAdd,clothing_workshop,,plastic,clothing,2,의류 공방: 플라스틱 투입 시 의류 +2/s
+modern_clothing,conditionalOutputAdd,clothing_workshop,,fabric,clothing,2,의류 공방: 직물 투입 시 의류 +2/s
+modern_clothing,conditionalOutputAdd,clothing_workshop,,plastic,clothing,2,의류 공방: 플라스틱 투입 시 의류 +2/s
+automation_equipment,conditionalOutputAdd,machine_parts_factory,,copper,machine_parts,2,기계부품 공장: 구리 투입 시 기계부품 +2/s
+automation_equipment,conditionalOutputAdd,machine_parts_factory,,oil,machine_parts,2,기계부품 공장: 석유 투입 시 기계부품 +2/s
+high_performance_concrete,conditionalOutputAdd,concrete_factory,,oil,concrete,2,콘크리트 공장: 석유 투입 시 콘크리트 +2/s
+synthetic_medicine,conditionalOutputAdd,medicine_workshop,,oil,medicine,2,약품 공방: 석유 투입 시 약품 +2/s
+synthetic_medicine,conditionalOutputAdd,medicine_workshop,,herbs,medicine,2,약품 공방: 약초 투입 시 약품 +2/s
+precision_glass,conditionalOutputAdd,glass_workshop,,coal,glass,1,유리 공방: 석탄 투입 시 유리 +1/s
+precision_glass,conditionalOutputAdd,glass_workshop,,copper,glass,1,유리 공방: 구리 투입 시 유리 +1/s
+packaged_furniture,conditionalOutputAdd,furniture_workshop,,plastic,furniture,1,가구 공방: 플라스틱 투입 시 가구 +1/s
+modern_administration,taxRateAdd,capital,,,treasury,0.04,세율 +0.04
+large_mines,conditionalOutputAdd,coal_mine,,machine_parts,coal,2,석탄 광산: 기계부품 투입 시 석탄 +2/s
+large_mines,conditionalOutputAdd,iron_mine,,machine_parts,iron,2,철 광산: 기계부품 투입 시 철 +2/s
+semiconductor_equipment,conditionalOutputAdd,machine_parts_factory,,glass,machine_parts,2,기계부품 공장: 유리 투입 시 기계부품 +2/s
+semiconductor_equipment,conditionalOutputAdd,machine_parts_factory,,copper,machine_parts,2,기계부품 공장: 구리 투입 시 기계부품 +2/s
+automated_logistics,plannedFollowUp,,all_mines,,,0,모든 광산 기계부품 투입 효율 +1은 그룹효과 후속 구현 예정
+precision_agriculture,conditionalOutputAdd,wheat_farm,,fertilizer,wheat,3,밀농장: 비료 투입 시 밀 +3/s
+precision_agriculture,conditionalOutputAdd,wheat_farm,,machine_parts,wheat,3,밀농장: 기계부품 투입 시 밀 +3/s
+biomedicine,conditionalOutputAdd,medicine_workshop,,herbs,medicine,3,약품 공방: 약초 투입 시 약품 +3/s
+biomedicine,conditionalOutputAdd,medicine_workshop,,glass,medicine,3,약품 공방: 유리 투입 시 약품 +3/s
+smart_factory,conditionalOutputAdd,tool_workshop,,machine_parts,tools,3,공구공장: 기계부품 투입 시 공구 +3/s
+synthetic_food,conditionalOutputAdd,groceries_factory,,fertilizer,groceries,2,식료품 공장: 비료 투입 시 식료품 +2/s
+synthetic_food,conditionalOutputAdd,groceries_factory,,plastic,groceries,2,식료품 공장: 플라스틱 투입 시 식료품 +2/s
+carbon_materials,conditionalOutputAdd,plastic_factory,,oil,plastic,2,플라스틱 공장: 석유 투입 시 플라스틱 +2/s
+advanced_appliances,conditionalOutputAdd,machine_parts_factory,,copper,machine_parts,1,기계부품 공장: 구리 투입 시 기계부품 +1/s
+advanced_appliances,conditionalOutputAdd,machine_parts_factory,,plastic,machine_parts,1,기계부품 공장: 플라스틱 투입 시 기계부품 +1/s
+data_taxation,taxRateAdd,capital,,,treasury,0.03,세율 +0.03
+automated_mining,conditionalOutputAdd,uranium_mine,,machine_parts,uranium,2,우라늄 광산: 기계부품 투입 시 우라늄 +2/s
+automated_mining,conditionalOutputAdd,oil_rig,,machine_parts,oil,2,석유 시추장: 기계부품 투입 시 석유 +2/s
+smart_clothing,conditionalOutputAdd,clothing_workshop,,plastic,clothing,2,의류 공방: 플라스틱 투입 시 의류 +2/s
+smart_clothing,conditionalOutputAdd,clothing_workshop,,fabric,clothing,2,의류 공방: 직물 투입 시 의류 +2/s
+advanced_automation,plannedFollowUp,,factories,,,0,공장 계열 기계부품 투입 효율 +1은 그룹효과 후속 구현 예정
+fusion_materials,outputAdd,uranium_mine,,,uranium,2,우라늄 광산 우라늄 +2/s
+nanomanufacturing,conditionalOutputAdd,machine_parts_factory,,plastic,machine_parts,3,기계부품 공장: 플라스틱 투입 시 기계부품 +3/s
+nanomanufacturing,conditionalOutputAdd,machine_parts_factory,,copper,machine_parts,3,기계부품 공장: 구리 투입 시 기계부품 +3/s
+ultra_high_strength_concrete,conditionalOutputAdd,concrete_factory,,uranium,concrete,2,콘크리트 공장: 우라늄 투입 시 콘크리트 +2/s
+ultra_high_strength_concrete,conditionalOutputAdd,concrete_factory,,stone,concrete,2,콘크리트 공장: 석재 투입 시 콘크리트 +2/s
+artificial_food,conditionalOutputAdd,groceries_factory,,fertilizer,groceries,3,식료품 공장: 비료 투입 시 식료품 +3/s
+artificial_food,conditionalOutputAdd,groceries_factory,,medicine,groceries,3,식료품 공장: 약품 투입 시 식료품 +3/s
+fully_automated_mining,plannedFollowUp,,all_mines,,,0,모든 광산 기계부품 투입 효율 +3은 그룹효과 후속 구현 예정
+synthetic_clothing,conditionalOutputAdd,clothing_workshop,,plastic,clothing,3,의류 공방: 플라스틱 투입 시 의류 +3/s
+molecular_medicine,conditionalOutputAdd,medicine_workshop,,herbs,medicine,3,약품 공방: 약초 투입 시 약품 +3/s
+molecular_medicine,conditionalOutputAdd,medicine_workshop,,glass,medicine,3,약품 공방: 유리 투입 시 약품 +3/s
+molecular_medicine,conditionalOutputAdd,medicine_workshop,,plastic,medicine,3,약품 공방: 플라스틱 투입 시 약품 +3/s
+autonomous_factory,conditionalOutputAdd,tool_workshop,,machine_parts,tools,3,공구공장: 기계부품 투입 시 공구 +3/s
+orbital_construction_materials,conditionalOutputAdd,concrete_factory,,iron,concrete,3,콘크리트 공장: 철 투입 시 콘크리트 +3/s
+orbital_construction_materials,conditionalOutputAdd,concrete_factory,,stone,concrete,3,콘크리트 공장: 석재 투입 시 콘크리트 +3/s
+future_taxation,taxRateAdd,capital,,,treasury,0.03,세율 +0.03
+ultra_precision_glass,conditionalOutputAdd,glass_workshop,,copper,glass,3,유리 공방: 구리 투입 시 유리 +3/s
+ultra_precision_glass,conditionalOutputAdd,glass_workshop,,coal,glass,3,유리 공방: 석탄 투입 시 유리 +3/s
+high_density_machinery,conditionalOutputAdd,machine_parts_factory,,iron,machine_parts,3,기계부품 공장: 철 투입 시 기계부품 +3/s
+high_density_machinery,conditionalOutputAdd,machine_parts_factory,,copper,machine_parts,3,기계부품 공장: 구리 투입 시 기계부품 +3/s
+high_density_machinery,conditionalOutputAdd,machine_parts_factory,,plastic,machine_parts,3,기계부품 공장: 플라스틱 투입 시 기계부품 +3/s
