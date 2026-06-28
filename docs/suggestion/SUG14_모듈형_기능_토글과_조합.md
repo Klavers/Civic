@@ -273,3 +273,24 @@ A만 ON이면 개혁 진행은 고정 지지·저항 계산으로 작동한다. 
 - `continuousHistory` 같은 상보적 campaign mode를 P04 범위에 포함할지
 - moduleVersion 불일치 시 migration 실패 UX
 - profile 공유·내보내기 기능과 플랫폼 업적 허용 기준
+
+## 14. P04 1차 구현 결정 (2026-06-28)
+
+- 기능을 켜고 끄는 방식 중 `2. 새 게임·환생 고급 설정`과 `5. 개발·테스트 Feature Matrix`만 구현한다.
+- `1. 프로젝트 전역 Feature Catalog`, `3. 규칙 preset/profile`, `4. 메타 진행에 따른 단계 해금`은 구현하지 않는다.
+- 모든 모듈 코드는 동일 build에 포함하고 runtime registry가 SUG06~SUG13의 고정 module definition과 integration 관계를 제공한다.
+- 플레이어 선택은 메인 메뉴의 모듈 설정에서 런 시작 전에 수행하고, 시작 후에는 immutable resolved feature set으로 고정한다.
+- 개발·테스트는 같은 resolver API로 Baseline, 단독 모듈, pairwise, AllOn case를 생성한다. Build Settings를 조합마다 변경하지 않는다.
+- SUG06~SUG13의 실제 도메인 기능이 구현되기 전에는 토글이 선택·의존성·런 전달 기반만 제공한다. 실제 gameplay 효과는 각 도메인 module 구현 시 같은 ID에 연결한다.
+- 외부 DLL·사용자 mod 자동 발견과 hot reload는 범위 밖이다. 이번 메뉴는 build에 포함된 모듈을 DLC/모드처럼 활성화하는 방식이다.
+- `CivicFeatureCatalog.asset`, gameplay preset 데이터, meta unlock 데이터는 생성하지 않는다.
+
+## 15. P04 SUG14 1차 구현 결과 (2026-06-28)
+
+- `CivicFeatureRegistry`가 SUG06~SUG13에 대응하는 상위 모듈 8종과 조합 integration ID를 같은 build 안에서 제공한다.
+- `CivicFeatureResolver`는 requested set의 누락 의존·충돌을 진단하고, 필요한 모듈이 모두 ON일 때만 integration을 활성화한다.
+- `CivicFeatureRuntime`은 메인 메뉴 선택 또는 `-civicFeatures` 명령행 입력을 받아 런 시작 시 resolved set을 불변으로 잠근다. `SampleScene` 직접 실행은 모든 신규 기능 OFF Baseline으로 시작한다.
+- `CivicMainMenu` Base Prefab과 사용자 Variant, `MainMenu.unity`를 생성했다. 사용자는 새 게임 전에 8개 모듈을 DLC/모드처럼 개별 ON/OFF할 수 있다.
+- 개발·테스트 Feature Matrix는 Baseline 1개, 단독 8개, pairwise 28개, AllOn 1개로 총 38개 case를 같은 resolver로 검증한다.
+- 실제 환생·도전·문명·국가·정치·이벤트·불가사의·위인 gameplay는 아직 연결하지 않았다. 메뉴에도 이 제한을 표시하며 각 도메인 구현 시 같은 module ID에 동작을 등록한다.
+- Unity 검증 결과: Compile, GenerateMainMenu, ValidateMainMenu, FeatureMatrix, ValidateData, GenerateUI, ValidateUI, EditMode 27/27, PlayMode 2/2 및 MSBuild가 통과했다.

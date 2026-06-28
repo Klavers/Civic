@@ -1,0 +1,8 @@
+wonderId,metricId,comparator,value
+great_civic_square,technology.researched.law_code,==,1
+peoples_parliament,institution.active.universal_suffrage,==,1
+world_welfare_agency,institution.active.universal_welfare,==,1
+civilization_museum,institution.active.public_education,==,1
+eternity_pyramid,meta.prestigeCount,>=,2
+civilization_ark,meta.completedAchievementCount,>=,30
+civilization_ark,meta.formedNationCount,>=,5

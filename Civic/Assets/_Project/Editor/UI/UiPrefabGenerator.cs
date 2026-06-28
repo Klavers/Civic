@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using Civic.Features;
 using Civic.Simulation;
 using Civic.UI;
 using UnityEditor;
@@ -157,6 +159,7 @@ namespace Civic.Editor.UI
                 var resourcesButton = CreateSidebarButton(sideBar.transform, "ResourcesPanelButton", "자원", -90f);
                 var buildingsButton = CreateSidebarButton(sideBar.transform, "BuildingsPanelButton", "건물", -180f);
                 var technologiesButton = CreateSidebarButton(sideBar.transform, "TechnologiesPanelButton", "기술", -270f);
+                var modulesButton = CreateSidebarButton(sideBar.transform, "ModulesPanelButton", "모듈", -360f);
 
                 var detailPanel = GetOrCreateChild(root.transform, "LeftDetailPanel", typeof(RectTransform), typeof(Image));
                 SetRect(detailPanel.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(640f, -36f), new Vector2(1040f, -140f));
@@ -226,6 +229,8 @@ namespace Civic.Editor.UI
                 rightResources.alignment = TextAnchor.UpperLeft;
                 SetRect(rightResources.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(18f, -48f), new Vector2(-36f, -96f));
                 var foodToggleButton = CreateActionButton(rightPanel.transform, "FoodToggleButton", "식량 펼침", new Vector2(0f, 34f));
+                var modulePanelView = CreateModulePanel(root, modulesButton, tooltipView, 18);
+                tooltipView.transform.SetAsLastSibling();
 
                 var view = GetOrAdd<CivicHudView>(root);
                 var viewObject = new SerializedObject(view);
@@ -277,6 +282,7 @@ namespace Civic.Editor.UI
                 controllerObject.FindProperty("view").objectReferenceValue = view;
                 controllerObject.FindProperty("dataSource").objectReferenceValue = dataSource;
                 controllerObject.FindProperty("simulationSpeed").doubleValue = 1d;
+                controllerObject.FindProperty("modulePanelView").objectReferenceValue = modulePanelView;
                 controllerObject.ApplyModifiedPropertiesWithoutUndo();
 
                 return PrefabUtility.SaveAsPrefabAsset(root, assetPath);
@@ -760,6 +766,112 @@ namespace Civic.Editor.UI
             text.alignment = TextAnchor.MiddleCenter;
             SetRect(text.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             return button;
+        }
+
+        private static CivicModulePanelView CreateModulePanel(GameObject root, Button openButton, CivicTooltipView tooltipView, int rowCount)
+        {
+            var panel = GetOrCreateChild(root.transform, "ModulePanel", typeof(RectTransform), typeof(Image));
+            SetRect(panel.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(640f, -36f), new Vector2(1040f, -140f));
+            panel.GetComponent<Image>().color = new Color(0.075f, 0.10f, 0.14f, 0.995f);
+            panel.transform.SetAsLastSibling();
+
+            var title = GetOrCreateText(panel.transform, "TitleLabel");
+            title.text = "모듈";
+            title.fontSize = 28;
+            title.alignment = TextAnchor.MiddleLeft;
+            SetRect(title.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(22f, -34f), new Vector2(-190f, 50f));
+            var status = GetOrCreateText(panel.transform, "StatusLabel");
+            status.text = "모듈 상태";
+            status.fontSize = 15;
+            status.color = new Color(0.70f, 0.78f, 0.88f, 1f);
+            status.alignment = TextAnchor.MiddleLeft;
+            SetRect(status.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(22f, -76f), new Vector2(-190f, 34f));
+            var closeButton = GetOrCreateButton(panel.transform, "CloseButton");
+            SetRect(closeButton.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-70f, -36f), new Vector2(100f, 48f));
+            closeButton.GetComponent<Image>().color = new Color(0.24f, 0.29f, 0.36f, 1f);
+            var closeLabel = GetOrCreateText(closeButton.transform, "Label");
+            closeLabel.text = "닫기";
+            closeLabel.fontSize = 18;
+            closeLabel.alignment = TextAnchor.MiddleCenter;
+            SetRect(closeLabel.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+            var tabRoots = new GameObject[CivicFeatureRegistry.Features.Count];
+            var tabButtons = new Button[tabRoots.Length];
+            var tabLabels = new Text[tabRoots.Length];
+            var tabArea = GetOrCreateChild(panel.transform, "TabArea", typeof(RectTransform));
+            SetRect(tabArea.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -132f), new Vector2(-36f, 96f));
+            for (var index = 0; index < tabRoots.Length; index++)
+            {
+                var tab = GetOrCreateChild(tabArea.transform, $"ModuleTab{index + 1:00}", typeof(RectTransform), typeof(Image), typeof(Button));
+                var column = index % 4;
+                var row = index / 4;
+                SetRect(tab.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(130f + column * 250f, -26f - row * 50f), new Vector2(230f, 42f));
+                tab.GetComponent<Image>().color = new Color(0.16f, 0.24f, 0.34f, 1f);
+                var button = tab.GetComponent<Button>();
+                button.targetGraphic = tab.GetComponent<Image>();
+                ConfigureButtonColors(button);
+                var label = GetOrCreateText(tab.transform, "Label");
+                label.text = "모듈";
+                label.fontSize = 15;
+                label.alignment = TextAnchor.MiddleCenter;
+                SetRect(label.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+                tabRoots[index] = tab;
+                tabButtons[index] = button;
+                tabLabels[index] = label;
+            }
+
+            var scroll = CreateScrollArea(panel.transform, "ModuleScroll", rowCount * 72f, 210f);
+            var rows = new CivicModuleActionRow[rowCount];
+            var expectedNames = new HashSet<string>(Enumerable.Range(1, rowCount).Select(index => $"ModuleActionRow{index:00}"));
+            for (var index = scroll.Content.childCount - 1; index >= 0; index--)
+            {
+                var child = scroll.Content.GetChild(index);
+                if (child.name.StartsWith("ModuleActionRow", StringComparison.Ordinal) && !expectedNames.Contains(child.name)) UnityEngine.Object.DestroyImmediate(child.gameObject);
+            }
+            for (var index = 0; index < rowCount; index++)
+            {
+                var row = GetOrCreateChild(scroll.Content, $"ModuleActionRow{index + 1:00}", typeof(RectTransform), typeof(Image));
+                SetTopStretchRect(row.GetComponent<RectTransform>(), 0f, index * 72f, 0f, 64f);
+                row.GetComponent<Image>().color = new Color(0.045f, 0.065f, 0.09f, 1f);
+                var info = GetOrCreateText(row.transform, "InfoLabel");
+                info.text = "모듈 항목";
+                info.fontSize = 16;
+                info.alignment = TextAnchor.MiddleLeft;
+                SetStretchRect(info.rectTransform, 14f, 6f, 200f, 6f);
+                var action = GetOrCreateButton(row.transform, "ActionButton");
+                SetRect(action.GetComponent<RectTransform>(), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-92f, 0f), new Vector2(160f, 48f));
+                action.GetComponent<Image>().color = new Color(0.20f, 0.36f, 0.58f, 1f);
+                var actionLabel = GetOrCreateText(action.transform, "Label");
+                actionLabel.text = "실행";
+                actionLabel.fontSize = 17;
+                actionLabel.alignment = TextAnchor.MiddleCenter;
+                SetRect(actionLabel.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+                var tooltip = GetOrAdd<CivicTooltipTrigger>(action.gameObject);
+                tooltip.AssignTooltipView(tooltipView);
+                var component = GetOrAdd<CivicModuleActionRow>(row);
+                var serializedRow = new SerializedObject(component);
+                serializedRow.FindProperty("infoLabel").objectReferenceValue = info;
+                serializedRow.FindProperty("actionButton").objectReferenceValue = action;
+                serializedRow.FindProperty("actionLabel").objectReferenceValue = actionLabel;
+                serializedRow.FindProperty("tooltip").objectReferenceValue = tooltip;
+                serializedRow.ApplyModifiedPropertiesWithoutUndo();
+                rows[index] = component;
+            }
+
+            var view = GetOrAdd<CivicModulePanelView>(root);
+            var serialized = new SerializedObject(view);
+            serialized.FindProperty("openButton").objectReferenceValue = openButton;
+            serialized.FindProperty("panelRoot").objectReferenceValue = panel;
+            serialized.FindProperty("closeButton").objectReferenceValue = closeButton;
+            serialized.FindProperty("titleLabel").objectReferenceValue = title;
+            serialized.FindProperty("statusLabel").objectReferenceValue = status;
+            AssignObjectArray(serialized, "tabRoots", tabRoots);
+            AssignObjectArray(serialized, "tabButtons", tabButtons);
+            AssignObjectArray(serialized, "tabLabels", tabLabels);
+            AssignObjectArray(serialized, "rows", rows);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            panel.SetActive(false);
+            return view;
         }
 
         private static Button CreateActionButton(Transform parent, string name, string label, Vector2 position)

@@ -1,0 +1,16 @@
+id,category,titleKo,descriptionKo,visibility,scope,prestigeReward,requiredFeatureIds
+thriving_settlement,growth,번성하는 정착지,인구 100 달성,visible,account,3,
+heart_of_industry,growth,산업의 심장,"런 최고 GDP 1,000,000 달성",visible,account,5,
+witness_of_ages,growth,시대의 증인,미래시대 진입,visible,account,10,
+balanced_budget,challenge,균형 예산,고대부터 산업까지 국고 0을 피함,visible,run,8,
+shortage_free_city,challenge,품귀 없는 도시,인구 250에서 공급률 90% 이상 120초 유지,visible,run,10,
+small_government,challenge,작은 정부,건설부문 5개 이하로 르네상스 진입,visible,run,7,
+wheat_empire,alternate,밀로 세운 제국,산업시대 밀 GDP 비중 60% 및 총 GDP 50000,visible,run,12,
+stone_axe_datacenter,alternate,돌도끼와 데이터센터,철 광산 없이 정보시대 진입,visible,run,15,
+last_house_republic,alternate,마지막 오두막의 공화국,집 1개 이하로 공화정과 인구 150 달성,visible,run,15,governance.politics
+age_of_reform,combined,개혁의 시대,정부·유권자·교육·복지를 각각 개혁,visible,run,10,governance.politics
+three_crowns,combined,세 개의 왕관,한 런에서 국가 설립 3단계 완료,visible,run,12,identity.nationFormation
+golden_age_designer,combined,황금기의 설계자,불가사의 2개와 위인 3명 은퇴 달성,visible,run,15,projects.wonders;people.greatPeople
+five_dawns,meta,다섯 번의 새벽,서로 다른 시작 문명 5개로 고전시대 도달,visible,account,10,identity.startCivilizations
+historian_library,meta,역사가의 서가,이벤트 60개 발견,visible,account,12,narrative.events
+nameless_founder,meta,이름 없는 건국자,비밀 국가 3개 설립,secret,account,20,identity.nationFormation

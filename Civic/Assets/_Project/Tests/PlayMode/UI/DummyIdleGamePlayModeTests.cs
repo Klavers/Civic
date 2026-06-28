@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Collections;
 using Civic.Simulation;
+using Civic.Features;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -10,6 +11,12 @@ namespace Civic.UI.Tests
 {
     public sealed class CivicHudPlayModeTests
     {
+        [SetUp]
+        public void SetUp()
+        {
+            CivicFeatureRuntime.ResetForMainMenu();
+        }
+
         [UnityTest]
         public IEnumerator CivicHud_AdvancesSimulationAndProcessesPrimaryButtons()
         {

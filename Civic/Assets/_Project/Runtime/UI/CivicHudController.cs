@@ -1,5 +1,10 @@
+using System;
+using System.Linq;
 using Civic.Simulation;
+using Civic.Features;
+using Civic.Simulation.Modules;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Civic.UI
 {
@@ -8,23 +13,31 @@ namespace Civic.UI
         [SerializeField] private CivicHudView view;
         [SerializeField] private CivicGameDataSource dataSource;
         [SerializeField] private double simulationSpeed = 1d;
+        [SerializeField] private CivicModulePanelView modulePanelView;
 
         private CivicGameSimulation simulation;
+        private CivicModuleRuntime moduleRuntime;
         private CivicHudPanelMode panelMode;
         private bool showFoodChildren;
         private string selectedTechnologyEraId;
+        private bool prestigeConfirmationPending;
 
         public CivicHudView View => view;
         public CivicGameSimulation Simulation => simulation;
+        public CivicModuleRuntime ModuleRuntime => moduleRuntime;
         public CivicGameDataSource DataSource => dataSource;
         public string SelectedTechnologyEraId => selectedTechnologyEraId;
-        public bool HasRequiredReferences => view != null && dataSource != null;
+        public CivicModulePanelView ModulePanelView => modulePanelView;
+        public bool HasRequiredReferences => view != null && dataSource != null && modulePanelView != null && modulePanelView.HasRequiredReferences;
 
         private void Awake()
         {
+            CivicFeatureRuntime.EnsureRunStarted();
+
             if (dataSource != null)
             {
                 simulation = new CivicGameSimulation(dataSource.LoadGameData());
+                moduleRuntime = new CivicModuleRuntime(simulation, CivicFeatureRuntime.Current);
             }
         }
 
@@ -42,6 +55,7 @@ namespace Civic.UI
             view.ResearchRequested += ResearchRequestedTechnology;
             view.EraTabRequested += SelectTechnologyEra;
             view.FoodToggleRequested += ToggleFoodChildren;
+            modulePanelView.ActionRequested += HandleModuleAction;
             Render();
         }
 
@@ -59,11 +73,12 @@ namespace Civic.UI
             view.ResearchRequested -= ResearchRequestedTechnology;
             view.EraTabRequested -= SelectTechnologyEra;
             view.FoodToggleRequested -= ToggleFoodChildren;
+            if (modulePanelView != null) modulePanelView.ActionRequested -= HandleModuleAction;
         }
 
         private void Update()
         {
-            simulation?.Advance(Time.deltaTime * simulationSpeed);
+            moduleRuntime?.Advance(Time.deltaTime * simulationSpeed);
             Render();
         }
 
@@ -73,7 +88,64 @@ namespace Civic.UI
             {
                 EnsureSelectedTechnologyEra(simulation.Snapshot);
                 view.Render(simulation.Snapshot, panelMode, showFoodChildren, selectedTechnologyEraId);
+                modulePanelView.Bind(moduleRuntime, prestigeConfirmationPending);
             }
+        }
+
+        private void HandleModuleAction(string featureId, string key)
+        {
+            if (moduleRuntime == null) return;
+            if (featureId == CivicFeatureRegistry.Prestige)
+            {
+                if (!prestigeConfirmationPending)
+                {
+                    prestigeConfirmationPending = true;
+                }
+                else
+                {
+                    var module = moduleRuntime.GetModule<CivicPrestigeModule>(featureId);
+                    if (module != null && module.TryPrestige(out _))
+                    {
+                        CivicFeatureRuntime.ResetForMainMenu();
+                        CivicRunLaunchSettings.Reset();
+                        SceneManager.LoadScene("MainMenu");
+                        return;
+                    }
+                }
+            }
+            else if (featureId == CivicFeatureRegistry.NationFormation)
+            {
+                var module = moduleRuntime.GetModule<CivicNationModule>(featureId);
+                var candidate = module?.Snapshot.FirstOrDefault(item => item.Definition.Id == key);
+                if (candidate?.State == CivicNationCandidateState.Ready) module.TryDeclare(key);
+                else if (candidate?.State == CivicNationCandidateState.Preparing) module.CancelPreparation();
+                else if (candidate?.State == CivicNationCandidateState.AwaitingCharter) module.TryCompleteFormation();
+            }
+            else if (featureId == CivicFeatureRegistry.Politics)
+            {
+                var module = moduleRuntime.GetModule<CivicPoliticsModule>(featureId);
+                if (key == "__cancel") module?.CancelReform();
+                else module?.TryPropose(key);
+            }
+            else if (featureId == CivicFeatureRegistry.Events)
+            {
+                var separator = key.IndexOf('|');
+                if (separator > 0) moduleRuntime.GetModule<CivicEventModule>(featureId)?.TryChoose(key.Substring(0, separator), key.Substring(separator + 1));
+            }
+            else if (featureId == CivicFeatureRegistry.Wonders)
+            {
+                var module = moduleRuntime.GetModule<CivicWonderModule>(featureId);
+                if (module?.ActiveProjectId == key) module.CancelActiveProject();
+                else module?.TryStart(key);
+            }
+            else if (featureId == CivicFeatureRegistry.GreatPeople)
+            {
+                var module = moduleRuntime.GetModule<CivicPeopleModule>(featureId);
+                if (key.StartsWith("recruit:", StringComparison.Ordinal)) module?.TryRecruit(key.Substring("recruit:".Length));
+                else if (key.StartsWith("ability:", StringComparison.Ordinal)) module?.TryUseAbility(key.Substring("ability:".Length));
+            }
+
+            Render();
         }
 
         private void ShowResourcesPanel()
@@ -102,14 +174,14 @@ namespace Civic.UI
 
         private void BuildRequestedBuilding(string buildingId)
         {
-            simulation?.TryBuild(buildingId);
+            moduleRuntime?.TryBuild(buildingId);
 
             Render();
         }
 
         private void ResearchRequestedTechnology(string technologyId)
         {
-            simulation?.TryResearch(technologyId);
+            moduleRuntime?.TryResearch(technologyId);
 
             Render();
         }

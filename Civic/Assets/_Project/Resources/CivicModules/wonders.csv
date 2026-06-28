@@ -1,0 +1,16 @@
+id,displayNameKo,conceptId,eraId,technologyId,upfrontTreasury,upkeepType,upkeepAmount,requiredFeatureIds
+great_library,대도서관,knowledge,classical,writing,0,none,0,
+celestial_observatory,천구 관측소,knowledge,renaissance,glass_lenses,2000,none,0,people.greatPeople
+world_knowledge_network,세계 지식망,knowledge,information,semiconductor_equipment,0,none,0,narrative.events
+grand_canal,대운하,infrastructure,classical,urban_planning,0,none,0,narrative.events
+continental_railway,대륙 철도망,infrastructure,industrial,railroad,0,none,0,
+orbital_elevator,궤도 승강기,infrastructure,future,orbital_construction_materials,0,gdpRatio,0.03,narrative.events;meta.prestige
+great_civic_square,시민 대광장,politics,ancient,,500,none,0,governance.politics
+peoples_parliament,만민 의회궁,politics,modern,,20000,none,0,governance.politics
+world_welfare_agency,세계 복지청,politics,information,,0,gdpRatio,0.05,governance.politics
+world_market_arcade,만국 시장회랑,culture,medieval,ledger_accounting,0,none,0,narrative.events
+civilization_museum,문명 박물관,culture,modern,,0,none,0,governance.politics;people.greatPeople
+world_exposition,세계 박람회장,culture,electric,electric_assembly,0,none,0,narrative.events
+eternity_pyramid,영원의 피라미드,meta,ancient,,0,none,0,meta.prestige;narrative.events
+artificial_sun,인공 태양로,meta,future,fusion_materials,0,treasuryPerSecond,100,
+civilization_ark,문명 방주,meta,future,,0,none,0,meta.prestige;progress.achievements;identity.nationFormation

@@ -1,0 +1,17 @@
+id,displayNameKo,conceptId,difficulty,descriptionKo,requiredFeatureIds
+default,기본 문명,default,normal,추가 특성 없이 기존 Civic 기준선으로 시작,
+arpadel,아르파델 수로민,river_agriculture,easy,밀과 인구 성장에 강하지만 광산 전환 비용이 높음,
+mirato,미라토 범람민,river_agriculture,normal,식량 비축에 강하지만 목재 생산이 낮음,narrative.events;governance.politics
+kalu,칼루 삼각주민,river_agriculture,normal,인구 소비와 식료품에 강하지만 건설 목재 부담이 큼,
+thalassa,탈라사 항구동맹,maritime_commerce,normal,세수와 상업 사건에 강하지만 기초 생산이 낮음,narrative.events
+nereon,네레온 선주회,maritime_commerce,hard,고가 상품 가격을 지키지만 건설력이 낮음,narrative.events
+lumer,루메르 자유항,maritime_commerce,normal,새 자원과 상업 사건 보상이 좋지만 기본 세율이 낮음,narrative.events;governance.politics
+braka,브라카 산성민,mountain_industry,normal,광물과 불가사의에 강하지만 밀 생산이 낮음,projects.wonders
+ordin,오르딘 용광로민,mountain_industry,hard,광산 인구 부담이 없지만 생활수준 요구가 높음,
+karst,카르스트 굴착민,mountain_industry,normal,건설 자재 효율이 높지만 세수가 낮음,narrative.events
+saran,사란 기마부족,steppe_mobility,normal,목축과 직물에 강하지만 종이와 과학이 낮음,
+belka,벨카 유목연맹,steppe_mobility,hard,건물 재배치에 강하지만 불가사의 비용이 높음,projects.wonders
+iska,이스카 대상민,steppe_mobility,hard,다품종 흑자 경제에 강하고 전문화에 제약이 있음,narrative.events
+serati,세라티 기록국,scholar_bureaucracy,normal,인구 과학과 이전 시대 연구에 강하지만 시작 인구가 낮음,
+acadium,아카디움 학회,scholar_bureaucracy,hard,시대별 첫 연구와 학자에 강하지만 건설비가 높음,people.greatPeople
+nomen,노멘 행정도시,scholar_bureaucracy,hard,개혁과 건국에 강하지만 직접 생산이 낮음,governance.politics;identity.nationFormation

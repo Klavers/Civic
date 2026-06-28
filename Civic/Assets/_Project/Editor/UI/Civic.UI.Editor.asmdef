@@ -2,6 +2,7 @@
   "name": "Civic.UI.Editor",
   "rootNamespace": "Civic.Editor.UI",
   "references": [
+    "Civic.Features.Runtime",
     "Civic.Simulation.Runtime",
     "Civic.UI.Runtime",
     "UnityEngine.UI",

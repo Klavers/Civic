@@ -1,5 +1,6 @@
 using System;
 using Civic.Simulation;
+using Civic.Simulation.Modules;
 using UnityEditor;
 using UnityEngine;
 
@@ -31,6 +32,13 @@ namespace Civic.Editor.UI
             }
 
             var data = dataSource.LoadGameData();
+            CivicModuleContentLoader.LoadFromResources();
+            CivicCivilizationContentLoader.LoadFromResources();
+            CivicPoliticsContentLoader.LoadFromResources();
+            CivicNationContentLoader.LoadFromResources();
+            CivicEventContentLoader.LoadFromResources();
+            CivicWonderContentLoader.LoadFromResources();
+            CivicPeopleContentLoader.LoadFromResources();
             Debug.Log("CIVIC_DATA_VALIDATION_OK");
             return data;
         }

@@ -1,0 +1,16 @@
+personId,id,effectType,targetId,amount,duration,usesPerRun
+liora_ven,forgotten_annotation,planned,random_previous_technology_discount,0.50,0,1
+tarek_on,conditional_supply_boost,planned,conditional_supply_rate,0.20,60,1
+mina_sorel,event_reroll,planned,next_event_candidates,3,0,1
+borin_kael,food_delivery,planned,wonder_food_delivery_ratio,0.20,0,1
+eda_mar,construction_surge,resourceOutputMultiplier,construction_power,0.25,120,1
+jin_oro,orbital_push,planned,wonder_progress_add,0.10,0,1
+asha_ren,conference_mediation,planned,remove_negative_nation_choice,1,0,1
+corvin_dal,parliamentary_push,planned,reform_progress_add,20,0,1
+nera_sol,emergency_relief,planned,population_shortage_penalty_reduction,0.50,60,1
+selim_baro,export_surplus,planned,stockpile_to_treasury,1,0,1
+ilia_crest,instant_recipe_change,planned,recipe_change_cooldown,0,0,1
+mara_kin,emergency_finance,planned,treasury_floor_protection,60,60,1
+oren_vale,chronicle_fixation,planned,recent_event_chronicle_bonus,1,0,1
+sia_noren,reveal_wonder_condition,planned,hidden_wonder_condition,1,0,1
+doran_pell,public_campaign,planned,reform_resistance_add,-20,90,1

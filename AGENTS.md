@@ -12,10 +12,12 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 - Unity 버전 정본: `Civic/ProjectSettings/ProjectVersion.txt`
 - 프로젝트 열기: Unity Hub에서 저장소의 `Civic/` 폴더 선택
-- CLI 래퍼: `powershell -ExecutionPolicy Bypass -File scripts/Invoke-Unity.ps1 -Action <Compile|GenerateUI|ValidateUI|ValidateData|TestEditMode|TestPlayMode>`
+- CLI 래퍼: `powershell -ExecutionPolicy Bypass -File scripts/Invoke-Unity.ps1 -Action <Compile|GenerateUI|GenerateMainMenu|ValidateUI|ValidateMainMenu|ValidateData|FeatureMatrix|TestEditMode|TestPlayMode>`
 - 열린 Editor에서 UI 생성: `Tools > Civic > UI > Generate`
 - 열린 Editor에서 UI 검증: `Tools > Civic > UI > Validate`
 - 열린 Editor에서 데이터 검증: `Tools > Civic > Data > Validate`
+- 열린 Editor에서 메인 메뉴 생성·검증: `Tools > Civic > Main Menu > Generate`, `Tools > Civic > Main Menu > Validate`
+- 열린 Editor에서 기능 조합 검증: `Tools > Civic > Features > Validate Matrix`
 
 현재 기준선(2026-06-23)은 CLI 생성·검증, EditMode·PlayMode 통과, 열린 Editor에서 Generate 2회 재실행·Validate 대화상자·`SampleScene` 업그레이드 기능 수동 확인까지 완료된 상태다. 이후 UI·씬·생성기 변경은 해당 검증을 다시 수행한다.
 
@@ -38,6 +40,8 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
    - 장점: 원본 Editor를 닫지 않고 자동 검증할 수 있다. 단점: 복사 시간과 디스크 사용량이 늘며 원본의 현재 미저장 상태는 검증하지 못한다. 영향도·비용: 높음.
 
 Editor가 닫혀 있고 `Civic/Temp/UnityLockfile`이 없을 때만 원본 프로젝트에 CLI 래퍼를 사용한다. `UiPrefabBootstrap`은 프리팹이 없을 때 최초 생성을 보조하지만, 기존 Base 갱신과 명시적 검증은 위 메뉴 또는 CLI 절차로 수행한다. 사용자 편집 Variant는 어느 경로에서도 덮어쓰지 않는다.
+
+메인 메뉴의 모듈 선택은 런 시작 전에만 변경하며 시작 후에는 불변이다. SUG14의 플레이어 설정은 동일 build 안의 runtime registry를 사용하고, 개발 검증은 Baseline·단독·pairwise·AllOn Feature Matrix를 사용한다. 조합별 Build Settings 변경, 프로젝트 전역 Feature Catalog asset, 규칙 preset, 메타 진행 해금은 사용하지 않는다.
 
 ### UI 생성·검증 도구 수명주기
 

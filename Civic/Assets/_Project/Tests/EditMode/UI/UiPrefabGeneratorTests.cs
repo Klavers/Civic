@@ -38,8 +38,11 @@ namespace Civic.UI.Tests
             var hud = AssetDatabase.LoadAssetAtPath<GameObject>(TestEditable + "/CivicHud.prefab");
             var view = hud.GetComponent<CivicHudView>();
             var controller = hud.GetComponent<CivicHudController>();
+            var modulePanel = hud.GetComponent<CivicModulePanelView>();
             Assert.That(view.HasRequiredReferences, Is.True);
             Assert.That(controller.HasRequiredReferences, Is.True);
+            Assert.That(modulePanel.HasRequiredReferences, Is.True);
+            Assert.That(modulePanel.Rows.Count, Is.EqualTo(18));
             Assert.That(view.ResourceDetailRows.Count, Is.EqualTo(30));
             Assert.That(view.ResourceSummaryLabels.Count, Is.EqualTo(30));
             Assert.That(view.ResourceProducerBoxes.Count, Is.EqualTo(120));
@@ -113,6 +116,10 @@ namespace Civic.UI.Tests
             Assert.That(CountChildrenNamed(hudBase, "ResourcesPanelButton"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "BuildingsPanelButton"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "TechnologiesPanelButton"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "ModulesPanelButton"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "ModulePanel"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "ModuleActionRow01"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "ModuleActionRow18"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "ResourceDetailRow01"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "ResourceDetailRow06"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "ResourceDetailRow30"), Is.EqualTo(1));

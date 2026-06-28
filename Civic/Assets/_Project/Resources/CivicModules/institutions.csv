@@ -1,0 +1,16 @@
+id,category,displayNameKo,descriptionKo,order,isDefault,politicalCost,treasuryCost,reformSeconds,fatigueSeconds
+tribal_council,government,부족 평의회,합의 중심의 원시 기본 정부,0,true,0,0,100,60
+hereditary_monarchy,government,세습 군주정,중앙권력과 대공사에 강한 정부,1,false,0,0,100,60
+representative_republic,government,대표 공화정,세수와 교육에 강하지만 정당성이 민감한 정부,2,false,0,0,100,60
+appointed_council,franchise,임명 평의회,소수 지도자가 빠르게 제안하는 기본 수립 방식,0,true,0,0,100,60
+property_franchise,franchise,재산권 선거,상공업 기반 정치력과 복지 저항을 만드는 선거제,1,false,0,0,100,60
+universal_suffrage,franchise,보통선거,인구와 생활수준을 정치 기반으로 삼는 선거제,2,false,0,0,100,60
+family_support,welfare,가족 부양,국고 비용 없이 부족 페널티를 그대로 받는 기본 복지,0,true,0,0,100,60
+poor_relief,welfare,빈민 구호,국고를 지출해 소비 부족 페널티를 일부 완화,1,false,0,0,100,60
+universal_welfare,welfare,보편 사회보장,높은 국고 비용으로 소비 부족과 과학을 보조,2,false,0,0,100,60
+traditional_transmission,education,전통 전수,국고 비용 없는 기본 교육,0,true,0,0,100,60
+private_religious_school,education,사설·종교 학당,학교 과학을 높이는 중세 교육,1,false,0,0,100,60
+public_education,education,공공 의무교육,인구 과학과 학자를 강화하는 현대 교육,2,false,0,0,100,60
+household_production,economy,가구 공동생산,1차 자원과 저비용 건설에 강한 기본 체계,0,true,0,0,100,60
+guild_regulation,economy,길드 규제,공방 효율과 품귀 완충을 제공하는 중세 체계,1,false,0,0,100,60
+industrial_labor_law,economy,산업 노동법,공장 생산과 생활수준을 높이는 산업 체계,2,false,0,0,100,60

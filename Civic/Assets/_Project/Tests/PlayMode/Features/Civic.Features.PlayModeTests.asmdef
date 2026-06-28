@@ -1,0 +1,24 @@
+{
+  "name": "Civic.Features.PlayModeTests",
+  "rootNamespace": "Civic.UI.Tests",
+  "references": [
+    "Civic.Features.Runtime",
+    "Civic.Simulation.Runtime",
+    "Civic.UI.Runtime",
+    "UnityEngine.UI"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
