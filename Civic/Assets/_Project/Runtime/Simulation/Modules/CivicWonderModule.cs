@@ -51,10 +51,34 @@ namespace Civic.Simulation.Modules
 
         public override string FeatureId => CivicFeatureRegistry.Wonders;
         public string ActiveProjectId => activeProjectId;
+        public IReadOnlyList<CivicWonderDefinition> Definitions => content.Wonders;
         public IReadOnlyCollection<string> CompletedIds => completedIds;
         public IReadOnlyList<CivicWonderSnapshot> Snapshot => snapshot;
         public IReadOnlyList<CivicWonderEffectDefinition> InactiveEffects => inactiveEffects;
         public int ProvisionalEffectCount => content.Effects.Count(item => item.EffectType == CivicProvisionalEffect.Planned);
+
+        public IReadOnlyList<CivicWonderCostDefinition> CostsFor(string wonderId) => Costs(wonderId).ToArray();
+        public IReadOnlyList<CivicWonderConditionDefinition> ConditionsFor(string wonderId) => content.Conditions.Where(item => item.WonderId == wonderId).ToArray();
+        public IReadOnlyList<CivicWonderEffectDefinition> EffectsFor(string wonderId) => content.Effects.Where(item => item.WonderId == wonderId).ToArray();
+        public IReadOnlyList<CivicMetricConditionSnapshot> ConditionStatusFor(string wonderId) => ConditionsFor(wonderId)
+            .Select(condition =>
+            {
+                var current = Context.Telemetry.GetMetric(condition.MetricId, Context.MetaProgress);
+                return new CivicMetricConditionSnapshot(
+                    condition.MetricId,
+                    condition.Comparator,
+                    condition.Value,
+                    current,
+                    CivicConditionEvaluator.Compare(current, condition.Comparator, condition.Value));
+            }).ToArray();
+
+        public double MinimumBuildSeconds(string wonderId)
+        {
+            var costs = Costs(wonderId).ToArray();
+            if (costs.Length == 0) return 0d;
+            var progressMultiplier = Context.Modifiers.Multiplier(CivicModifierEffectTypes.WonderProgressMultiplier, wonderId, "*");
+            return costs.Max(cost => EffectiveCostAmount(cost, wonderId) / Math.Max(1e-9d, cost.DeliveryRate * progressMultiplier));
+        }
 
         public override void Initialize(CivicModuleContext context)
         {

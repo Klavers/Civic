@@ -9,6 +9,7 @@ namespace Civic.Simulation.Modules
     {
         Unavailable,
         InProgress,
+        ImpossibleThisRun,
         Failed,
         Completed
     }
@@ -39,24 +40,39 @@ namespace Civic.Simulation.Modules
     public sealed class CivicAchievementModule : CivicGameplayModuleBase
     {
         private readonly IReadOnlyList<CivicAchievementDefinition> definitions;
+        private readonly IReadOnlyList<CivicAchievementRewardDefinition> rewards;
         private readonly Dictionary<string, double> heldSeconds = new Dictionary<string, double>(StringComparer.Ordinal);
         private readonly HashSet<string> failedIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> completedThisRun = new HashSet<string>(StringComparer.Ordinal);
         private IReadOnlyList<CivicAchievementProgressSnapshot> snapshot = Array.Empty<CivicAchievementProgressSnapshot>();
 
-        public CivicAchievementModule(IReadOnlyList<CivicAchievementDefinition> definitions)
+        public CivicAchievementModule(IReadOnlyList<CivicAchievementDefinition> definitions, IReadOnlyList<CivicAchievementRewardDefinition> rewards = null)
         {
             this.definitions = definitions ?? throw new ArgumentNullException(nameof(definitions));
+            this.rewards = rewards ?? Array.Empty<CivicAchievementRewardDefinition>();
         }
 
         public override string FeatureId => CivicFeatureRegistry.Achievements;
         public IReadOnlyList<CivicAchievementProgressSnapshot> Snapshot => snapshot;
         public IReadOnlyCollection<string> CompletedThisRun => completedThisRun;
+        public IReadOnlyList<CivicAchievementRewardDefinition> Rewards => rewards;
         public int PrestigeRewardEarnedThisRun { get; private set; }
+
+        public IReadOnlyList<CivicMetricConditionSnapshot> ConditionStatusFor(string achievementId)
+        {
+            var definition = definitions.First(item => item.Id == achievementId);
+            return definition.Conditions.Select(condition =>
+            {
+                var current = Context.Telemetry.GetMetric(condition.MetricId, Context.MetaProgress);
+                var comparison = CivicConditionEvaluator.Compare(current, condition.Comparator, condition.Value);
+                return new CivicMetricConditionSnapshot(condition.MetricId, condition.Comparator, condition.Value, current, condition.Forbidden ? !comparison : comparison, forbidden: condition.Forbidden, duration: condition.Duration);
+            }).ToArray();
+        }
 
         public override void Initialize(CivicModuleContext context)
         {
             base.Initialize(context);
+            RebuildPermanentRewards();
             Evaluate(0d);
         }
 
@@ -134,6 +150,16 @@ namespace Civic.Simulation.Modules
                 if (unsatisfied != null)
                 {
                     heldSeconds[definition.Id] = 0d;
+                    if (IsImpossibleThisRun(unsatisfied))
+                    {
+                        snapshots.Add(new CivicAchievementProgressSnapshot(
+                            definition,
+                            CivicAchievementState.ImpossibleThisRun,
+                            0d,
+                            RequiredDuration(definition),
+                            $"이번 런에서 복구 불가: {unsatisfied.MetricId}"));
+                        continue;
+                    }
                     snapshots.Add(new CivicAchievementProgressSnapshot(
                         definition,
                         CivicAchievementState.InProgress,
@@ -180,12 +206,41 @@ namespace Civic.Simulation.Modules
             Context.MetaProgress.CompletedAchievementIds.Add(definition.Id);
             completedThisRun.Add(definition.Id);
             PrestigeRewardEarnedThisRun += definition.PrestigeReward;
+            ApplyPermanentReward(definition.Id);
+            Context.Simulation.RefreshSnapshot();
             CivicMetaSession.Store.Save(Context.MetaProgress);
+        }
+
+        public IReadOnlyList<CivicAchievementRewardDefinition> RewardsFor(string achievementId) => rewards.Where(item => item.AchievementId == achievementId).ToArray();
+
+        private void RebuildPermanentRewards()
+        {
+            foreach (var reward in rewards) Context.Modifiers.RemoveSource("achievement", reward.AchievementId);
+            foreach (var achievementId in Context.MetaProgress.CompletedAchievementIds.Distinct(StringComparer.Ordinal)) ApplyPermanentReward(achievementId);
+            Context.Simulation.RefreshSnapshot();
+        }
+
+        private void ApplyPermanentReward(string achievementId)
+        {
+            var entries = rewards.Where(item => item.AchievementId == achievementId)
+                .Select(item => new CivicModifierEntry("achievement", achievementId, item.EffectType, item.TargetId, item.Amount, item.CapGroup))
+                .ToArray();
+            if (entries.Length > 0) Context.Modifiers.ReplaceSource("achievement", achievementId, entries);
         }
 
         private static double RequiredDuration(CivicAchievementDefinition definition)
         {
             return definition.Conditions.Where(condition => !condition.Forbidden).Select(condition => condition.Duration).DefaultIfEmpty(0d).Max();
+        }
+
+        private bool IsImpossibleThisRun(CivicAchievementConditionDefinition condition)
+        {
+            var current = Context.Telemetry.GetMetric(condition.MetricId, Context.MetaProgress);
+            if (condition.MetricId.StartsWith("identity.startingCivilization.", StringComparison.Ordinal)) return !CivicConditionEvaluator.Compare(current, condition.Comparator, condition.Value);
+            if (condition.MetricId.StartsWith("building.ever.", StringComparison.Ordinal) && condition.Comparator == "==" && condition.Value <= 0d) return current > 0d;
+            if (condition.MetricId.StartsWith("run.", StringComparison.Ordinal) && condition.Comparator == "==" && current > condition.Value) return true;
+            if (condition.MetricId == "run.highestEraOrder" && condition.Comparator == "<=" && current > condition.Value) return true;
+            return false;
         }
 
     }

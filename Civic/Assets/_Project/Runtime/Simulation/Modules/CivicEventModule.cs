@@ -21,16 +21,22 @@ namespace Civic.Simulation.Modules
 
     public sealed class CivicEventHistoryEntry
     {
-        public CivicEventHistoryEntry(string eventId, string choiceId, double occurredAt)
+        public CivicEventHistoryEntry(string eventId, string eventTitleKo, string choiceId, string choiceTextKo, double occurredAt, IReadOnlyList<string> appliedResults)
         {
             EventId = eventId;
+            EventTitleKo = eventTitleKo;
             ChoiceId = choiceId;
+            ChoiceTextKo = choiceTextKo;
             OccurredAt = occurredAt;
+            AppliedResults = appliedResults ?? Array.Empty<string>();
         }
 
         public string EventId { get; }
+        public string EventTitleKo { get; }
         public string ChoiceId { get; }
+        public string ChoiceTextKo { get; }
         public double OccurredAt { get; }
+        public IReadOnlyList<string> AppliedResults { get; }
     }
 
     public sealed class CivicEventModule : CivicGameplayModuleBase
@@ -138,9 +144,9 @@ namespace Civic.Simulation.Modules
             var queued = queue.FirstOrDefault(item => item.Definition.Id == eventId);
             var choice = content.Choices.FirstOrDefault(item => item.EventId == eventId && item.Id == choiceId);
             if (queued == null || choice == null || !IsChoiceAvailable(choiceId)) return false;
-            ApplyChoice(queued.Definition, choice);
+            var appliedResults = ApplyChoice(queued.Definition, choice);
             queue.Remove(queued);
-            history.Add(new CivicEventHistoryEntry(eventId, choiceId, Context.Telemetry.ElapsedSeconds));
+            history.Add(new CivicEventHistoryEntry(eventId, queued.Definition.TitleKo, choiceId, choice.TextKo, Context.Telemetry.ElapsedSeconds, appliedResults));
             cooldowns[eventId] = queued.Definition.CooldownSeconds * Context.Modifiers.Multiplier(CivicModifierEffectTypes.EventCooldownMultiplier, eventId, queued.Definition.Category, "*");
             accumulatedWeights[eventId] = 0d;
             eligibleDurations[eventId] = 0d;
@@ -151,6 +157,26 @@ namespace Civic.Simulation.Modules
             CivicMetaSession.Store.Save(Context.MetaProgress);
             if (!string.IsNullOrEmpty(choice.NextEventId)) QueueEvent(content.Events.First(item => item.Id == choice.NextEventId), "연쇄: " + choiceId);
             Context.Simulation.RefreshSnapshot();
+            PublishMetrics();
+            return true;
+        }
+
+        public string DescribeChoice(string choiceId)
+        {
+            var choice = content.Choices.FirstOrDefault(item => item.Id == choiceId);
+            if (choice == null) return string.Empty;
+            var descriptions = content.Effects.Where(item => item.ChoiceId == choiceId).Select(DescribeEffect).ToArray();
+            var requirement = string.IsNullOrEmpty(choice.RequirementMetricId)
+                ? string.Empty
+                : $"조건: {choice.RequirementMetricId} {choice.RequirementComparator} {choice.RequirementValue:0.##}";
+            return string.Join("\n", new[] { requirement }.Concat(descriptions).Where(item => !string.IsNullOrWhiteSpace(item)));
+        }
+
+        public bool DebugQueueEvent(string eventId)
+        {
+            var definition = content.Events.FirstOrDefault(item => item.Id == eventId);
+            if (definition == null || queue.Count >= QueueLimit || queue.Any(item => item.Definition.Id == eventId)) return false;
+            QueueEvent(definition, "DEBUG 강제 발생");
             PublishMetrics();
             return true;
         }
@@ -248,20 +274,40 @@ namespace Civic.Simulation.Modules
             Context.Telemetry.SetExternalMetric("event.queued." + definition.Id, 1d);
         }
 
-        private void ApplyChoice(CivicEventDefinition definition, CivicEventChoiceDefinition choice)
+        private IReadOnlyList<string> ApplyChoice(CivicEventDefinition definition, CivicEventChoiceDefinition choice)
         {
+            var applied = new List<string>();
             foreach (var effect in content.Effects.Where(item => item.ChoiceId == choice.Id))
             {
                 var resolved = effect.Resolve();
-                if (resolved.EffectType == "resourceGrant") Context.Simulation.GrantResource(resolved.TargetId, CivicNumber.FromDouble(resolved.Amount));
-                else if (resolved.EffectType == "prestigeGrant") { Context.MetaProgress.PrestigePoints += (long)Math.Round(resolved.Amount); }
-                else if (resolved.EffectType == "politicalCapitalGrant") Context.GetModule<CivicPoliticsModule>(CivicFeatureRegistry.Politics)?.GrantPoliticalCapital(resolved.Amount);
-                else if (resolved.EffectType == "reformProgressAdd") Context.GetModule<CivicPoliticsModule>(CivicFeatureRegistry.Politics)?.AddReformProgress(resolved.Amount);
-                else if (resolved.EffectType == "wonderProgressAdd") Context.GetModule<CivicWonderModule>(CivicFeatureRegistry.Wonders)?.AddProgressFraction(resolved.Amount);
-                else if (resolved.EffectType == "flagSet") Context.Telemetry.SetExternalMetric("event.flag." + resolved.TargetId, resolved.Amount);
-                else if (!resolved.IsProvisional && !DirectModifierEffects.Contains(resolved.EffectType)) { if (!inactiveEffects.Contains(effect)) inactiveEffects.Add(effect); }
-                else ApplyModifier(definition.Id, choice.Id, effect, resolved);
+                if (resolved.EffectType == "resourceGrant")
+                {
+                    var before = Context.Simulation.State.Resources.TryGetValue(resolved.TargetId, out var current) ? current.ToDouble() : 0d;
+                    Context.Simulation.GrantResource(resolved.TargetId, CivicNumber.FromDouble(resolved.Amount));
+                    var after = Context.Simulation.State.Resources.TryGetValue(resolved.TargetId, out current) ? current.ToDouble() : before;
+                    applied.Add($"{resolved.TargetId}: {before:0.##} → {after:0.##}");
+                }
+                else if (resolved.EffectType == "prestigeGrant") { Context.MetaProgress.PrestigePoints += (long)Math.Round(resolved.Amount); applied.Add($"환생 포인트 {resolved.Amount:+0.##;-0.##;0}"); }
+                else if (resolved.EffectType == "politicalCapitalGrant") { Context.GetModule<CivicPoliticsModule>(CivicFeatureRegistry.Politics)?.GrantPoliticalCapital(resolved.Amount); applied.Add($"정치력 {resolved.Amount:+0.##;-0.##;0}"); }
+                else if (resolved.EffectType == "reformProgressAdd") { Context.GetModule<CivicPoliticsModule>(CivicFeatureRegistry.Politics)?.AddReformProgress(resolved.Amount); applied.Add($"개혁 진행 {resolved.Amount:+0.##;-0.##;0}"); }
+                else if (resolved.EffectType == "wonderProgressAdd") { Context.GetModule<CivicWonderModule>(CivicFeatureRegistry.Wonders)?.AddProgressFraction(resolved.Amount); applied.Add($"불가사의 진행 {resolved.Amount:+0.##;-0.##;0}"); }
+                else if (resolved.EffectType == "flagSet") { Context.Telemetry.SetExternalMetric("event.flag." + resolved.TargetId, resolved.Amount); applied.Add($"플래그 {resolved.TargetId}={resolved.Amount:0.##}"); }
+                else if (!resolved.IsProvisional && !DirectModifierEffects.Contains(resolved.EffectType))
+                {
+                    if (!inactiveEffects.Contains(effect)) inactiveEffects.Add(effect);
+                    applied.Add("현재 런타임 미지원: " + DescribeResolvedEffect(resolved));
+                }
+                else { ApplyModifier(definition.Id, choice.Id, effect, resolved); applied.Add(DescribeResolvedEffect(resolved)); }
             }
+            return applied;
+        }
+
+        private string DescribeEffect(CivicEventEffectDefinition effect) => DescribeResolvedEffect(effect.Resolve());
+
+        private static string DescribeResolvedEffect(CivicResolvedModuleEffect resolved)
+        {
+            var duration = resolved.Duration > 0d ? $" · {resolved.Duration:0.#}초" : " · 지속";
+            return $"{resolved.EffectType}({resolved.TargetId}) {resolved.Amount:+0.##;-0.##;0}{duration}";
         }
 
         private void ApplyModifier(string eventId, string choiceId, CivicEventEffectDefinition effect, CivicResolvedModuleEffect resolved)

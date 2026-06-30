@@ -39,6 +39,7 @@ namespace Civic.Simulation.Modules
         private readonly CivicNationContent content;
         private readonly Dictionary<string, double> preparationProgress = new Dictionary<string, double>(StringComparer.Ordinal);
         private readonly List<CivicNationEffectDefinition> inactiveEffects = new List<CivicNationEffectDefinition>();
+        private readonly HashSet<string> debugReadyIds = new HashSet<string>(StringComparer.Ordinal);
         private string preparingNationId;
         private string awaitingCharterNationId;
         private IReadOnlyList<CivicNationCandidateSnapshot> snapshot = Array.Empty<CivicNationCandidateSnapshot>();
@@ -51,8 +52,59 @@ namespace Civic.Simulation.Modules
         public override string FeatureId => CivicFeatureRegistry.NationFormation;
         public string CurrentNationId { get; private set; } = string.Empty;
         public IReadOnlyList<CivicNationCandidateSnapshot> Snapshot => snapshot;
+        public IReadOnlyList<CivicNationDefinition> Definitions => content.Nations;
         public IReadOnlyList<CivicNationEffectDefinition> InactiveEffects => inactiveEffects;
         public int ProvisionalEffectCount => string.IsNullOrEmpty(CurrentNationId) ? 0 : content.Effects.Count(item => item.NationId == CurrentNationId && item.EffectType == CivicProvisionalEffect.Planned);
+
+        public IReadOnlyList<CivicNationConditionDefinition> ConditionsFor(string nationId) => content.Conditions.Where(item => item.NationId == nationId).ToArray();
+        public IReadOnlyList<CivicNationEffectDefinition> EffectsFor(string nationId) => content.Effects.Where(item => item.NationId == nationId).ToArray();
+        public IReadOnlyList<CivicMetricConditionSnapshot> ConditionStatusFor(string nationId) => ConditionsFor(nationId)
+            .Select(condition =>
+            {
+                var current = Context.Telemetry.GetMetric(condition.MetricId, Context.MetaProgress);
+                return new CivicMetricConditionSnapshot(
+                    condition.MetricId,
+                    condition.Comparator,
+                    condition.Value,
+                    current,
+                    debugReadyIds.Contains(nationId) || CivicConditionEvaluator.Compare(current, condition.Comparator, condition.Value),
+                    condition.AlternativeGroup);
+            }).ToArray();
+
+        public bool IsImpossibleThisRun(string nationId)
+        {
+            return !string.IsNullOrEmpty(ImpossibleReasonFor(nationId));
+        }
+
+        public string ImpossibleReasonFor(string nationId)
+        {
+            var nation = content.Nations.FirstOrDefault(item => item.Id == nationId);
+            if (nation == null || debugReadyIds.Contains(nationId)) return string.Empty;
+            var missingFeature = nation.RequiredFeatureIds.FirstOrDefault(id => !Context.IsFeatureEnabled(id));
+            if (!string.IsNullOrEmpty(missingFeature)) return "런 시작 시 비활성화된 필수 모듈: " + missingFeature;
+
+            var conditions = content.Conditions.Where(item => item.NationId == nationId).ToArray();
+            var impossibleDirect = conditions
+                .Where(item => string.IsNullOrEmpty(item.AlternativeGroup))
+                .FirstOrDefault(IsConditionImpossibleThisRun);
+            if (impossibleDirect != null) return "고정된 런 조건 불일치: " + impossibleDirect.MetricId;
+
+            var impossibleAlternative = conditions
+                .Where(item => !string.IsNullOrEmpty(item.AlternativeGroup))
+                .GroupBy(item => item.AlternativeGroup, StringComparer.Ordinal)
+                .FirstOrDefault(group => group.All(IsConditionImpossibleThisRun));
+            return impossibleAlternative == null
+                ? string.Empty
+                : "대안 조건을 모두 달성할 수 없음: " + impossibleAlternative.Key;
+        }
+
+        public bool DebugSatisfyConditions(string nationId)
+        {
+            if (content.Nations.All(item => item.Id != nationId)) return false;
+            debugReadyIds.Add(nationId);
+            RebuildSnapshot();
+            return true;
+        }
 
         public override void Initialize(CivicModuleContext context)
         {
@@ -154,6 +206,7 @@ namespace Civic.Simulation.Modules
 
         private bool ConditionsSatisfied(CivicNationDefinition nation)
         {
+            if (debugReadyIds.Contains(nation.Id)) return true;
             var conditions = content.Conditions.Where(item => item.NationId == nation.Id).ToArray();
             var direct = conditions.Where(item => string.IsNullOrEmpty(item.AlternativeGroup));
             if (direct.Any(condition => !ConditionSatisfied(condition))) return false;
@@ -168,6 +221,30 @@ namespace Civic.Simulation.Modules
                 Context.Telemetry.GetMetric(condition.MetricId, Context.MetaProgress),
                 condition.Comparator,
                 condition.Value);
+        }
+
+        private bool IsConditionImpossibleThisRun(CivicNationConditionDefinition condition)
+        {
+            var current = Context.Telemetry.GetMetric(condition.MetricId, Context.MetaProgress);
+            if (condition.MetricId.StartsWith("identity.startingCivilization.", StringComparison.Ordinal))
+            {
+                return !CivicConditionEvaluator.Compare(current, condition.Comparator, condition.Value);
+            }
+
+            if (!IsMonotonicMetric(condition.MetricId)) return false;
+            if (condition.Comparator == "<=") return current > condition.Value + 1e-9d;
+            if (condition.Comparator == "==") return current > condition.Value + 1e-9d;
+            return false;
+        }
+
+        private static bool IsMonotonicMetric(string metricId)
+        {
+            return metricId.StartsWith("run.", StringComparison.Ordinal) ||
+                metricId.StartsWith("meta.", StringComparison.Ordinal) ||
+                metricId.StartsWith("technology.researched.", StringComparison.Ordinal) ||
+                metricId.StartsWith("building.ever.", StringComparison.Ordinal) ||
+                metricId.StartsWith("wonder.", StringComparison.Ordinal) ||
+                metricId.StartsWith("event.choice.", StringComparison.Ordinal);
         }
 
         private double ConditionRatio(CivicNationDefinition nation)
@@ -194,7 +271,11 @@ namespace Civic.Simulation.Modules
                     : ConditionsSatisfied(nation) ? CivicNationCandidateState.Ready
                     : ratio >= 0.70d ? CivicNationCandidateState.Discovered
                     : CivicNationCandidateState.Hidden;
-                return new CivicNationCandidateSnapshot(nation, state, ratio, progress, state == CivicNationCandidateState.Ready ? string.Empty : "조건 미충족");
+                var impossibleReason = ImpossibleReasonFor(nation.Id);
+                var blockingReason = state == CivicNationCandidateState.Ready
+                    ? string.Empty
+                    : string.IsNullOrEmpty(impossibleReason) ? "조건 미충족" : "이번 런 달성 불가: " + impossibleReason;
+                return new CivicNationCandidateSnapshot(nation, state, ratio, progress, blockingReason);
             }).ToArray();
         }
 

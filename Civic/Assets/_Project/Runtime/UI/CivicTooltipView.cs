@@ -10,11 +10,7 @@ namespace Civic.UI
         [SerializeField] private Vector2 screenOffset = new Vector2(18f, -18f);
 
         public bool HasRequiredReferences => panel != null && bodyLabel != null;
-
-        private void Awake()
-        {
-            Hide();
-        }
+        public bool IsVisible => panel != null && panel.gameObject.activeSelf;
 
         public void Show(string text, Vector2 screenPosition)
         {

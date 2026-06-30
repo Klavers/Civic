@@ -59,6 +59,7 @@ namespace Civic.Simulation.Modules
     {
         CivicMetaProgress Load();
         void Save(CivicMetaProgress progress);
+        void Delete();
     }
 
     public sealed class CivicInMemoryMetaProgressStore : ICivicMetaProgressStore
@@ -75,6 +76,11 @@ namespace Civic.Simulation.Modules
         public void Save(CivicMetaProgress value)
         {
             progress = value ?? throw new ArgumentNullException(nameof(value));
+        }
+
+        public void Delete()
+        {
+            progress = new CivicMetaProgress();
         }
     }
 
@@ -125,6 +131,14 @@ namespace Civic.Simulation.Modules
             else
             {
                 File.Move(temporary, path);
+            }
+        }
+
+        public void Delete()
+        {
+            foreach (var candidate in new[] { path, path + ".bak", path + ".tmp" })
+            {
+                if (File.Exists(candidate)) File.Delete(candidate);
             }
         }
 

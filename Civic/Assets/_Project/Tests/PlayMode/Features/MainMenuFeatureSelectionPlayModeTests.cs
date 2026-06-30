@@ -94,5 +94,24 @@ namespace Civic.UI.Tests
             Assert.That(panel.Rows.Any(row => row.gameObject.activeSelf), Is.True);
             Assert.That(panel.Rows.Any(row => row.gameObject.activeSelf && !string.IsNullOrEmpty(row.InfoLabel.text)), Is.True);
         }
+
+        [UnityTest]
+        public IEnumerator MainMenu_OptionsDeletesMetaSaveAfterTwoStepConfirmation()
+        {
+            CivicMetaSession.ResetForTests(new CivicMetaProgress { PrestigePoints = 77, PrestigeCount = 3 });
+            SceneManager.LoadScene("MainMenu");
+            yield return null;
+            yield return null;
+
+            var controller = Object.FindFirstObjectByType<CivicMainMenuController>();
+            controller.OpenOptionsPanelButton.onClick.Invoke();
+            yield return null;
+            Assert.That(controller.OptionsPanel.activeSelf, Is.True);
+            controller.DeleteSaveDataButton.onClick.Invoke();
+            Assert.That(CivicMetaSession.Store.Load().PrestigePoints, Is.EqualTo(77));
+            controller.DeleteSaveDataButton.onClick.Invoke();
+            Assert.That(CivicMetaSession.Store.Load().PrestigePoints, Is.Zero);
+            Assert.That(CivicMetaSession.Store.Load().PrestigeCount, Is.Zero);
+        }
     }
 }

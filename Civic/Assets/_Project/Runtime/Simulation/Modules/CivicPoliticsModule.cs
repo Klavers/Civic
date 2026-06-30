@@ -29,6 +29,7 @@ namespace Civic.Simulation.Modules
         private readonly Dictionary<string, string> activeByCategory = new Dictionary<string, string>(StringComparer.Ordinal);
         private readonly Dictionary<string, int> reformCountByCategory = new Dictionary<string, int>(StringComparer.Ordinal);
         private readonly List<CivicInstitutionEffectDefinition> inactiveEffects = new List<CivicInstitutionEffectDefinition>();
+        private readonly HashSet<string> debugUnlockedIds = new HashSet<string>(StringComparer.Ordinal);
         private string targetInstitutionId;
         private double reformProgress;
 
@@ -48,6 +49,34 @@ namespace Civic.Simulation.Modules
         public double PoliticalCapital { get; private set; }
         public double FatigueRemaining { get; private set; }
         public CivicReformSnapshot Reform { get; private set; }
+
+        public IReadOnlyList<CivicInstitutionUnlockDefinition> UnlocksFor(string institutionId) => content.Unlocks.Where(item => item.InstitutionId == institutionId).ToArray();
+        public IReadOnlyList<CivicInstitutionEffectDefinition> EffectsFor(string institutionId) => content.Effects.Where(item => item.InstitutionId == institutionId).ToArray();
+        public IReadOnlyList<CivicMetricConditionSnapshot> UnlockStatusFor(string institutionId) => UnlocksFor(institutionId)
+            .Select(unlock =>
+            {
+                var current = Context.Telemetry.GetMetric(unlock.MetricId, Context.MetaProgress);
+                return new CivicMetricConditionSnapshot(
+                    unlock.MetricId,
+                    unlock.Comparator,
+                    unlock.Value,
+                    current,
+                    debugUnlockedIds.Contains(institutionId) || CivicConditionEvaluator.Compare(current, unlock.Comparator, unlock.Value),
+                    unlock.AlternativeGroup);
+            }).ToArray();
+
+        public bool DebugUnlockAndFund(string institutionId)
+        {
+            var institution = content.Institutions.FirstOrDefault(item => item.Id == institutionId);
+            if (institution == null) return false;
+            debugUnlockedIds.Add(institutionId);
+            PoliticalCapital = Math.Max(PoliticalCapital, institution.PoliticalCost);
+            var treasury = Context.Simulation.State.Resources["treasury"].ToDouble();
+            if (treasury < institution.TreasuryCost) Context.Simulation.GrantResource("treasury", CivicNumber.FromDouble(institution.TreasuryCost - treasury));
+            Context.Simulation.RefreshSnapshot();
+            PublishMetrics();
+            return true;
+        }
 
         public override void Initialize(CivicModuleContext context)
         {
@@ -82,6 +111,7 @@ namespace Civic.Simulation.Modules
         {
             var institution = content.Institutions.FirstOrDefault(item => item.Id == institutionId);
             if (institution == null) return false;
+            if (debugUnlockedIds.Contains(institutionId)) return true;
             var unlocks = content.Unlocks.Where(item => item.InstitutionId == institutionId).ToArray();
             var direct = unlocks.Where(item => string.IsNullOrEmpty(item.AlternativeGroup));
             if (direct.Any(unlock => !UnlockSatisfied(unlock))) return false;

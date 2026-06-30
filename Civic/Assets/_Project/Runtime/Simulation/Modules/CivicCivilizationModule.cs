@@ -57,6 +57,8 @@ namespace Civic.Simulation.Modules
         public IReadOnlyList<CivicCivilizationDefinition> Definitions => content.Civilizations;
         public IReadOnlyList<CivicCivilizationEffectDefinition> InactiveEffects => inactiveEffects;
         public int ProvisionalEffectCount => ActiveCivilization == null ? 0 : content.Effects.Count(item => item.CivilizationId == ActiveCivilization.Id && item.EffectType == CivicProvisionalEffect.Planned);
+        public IReadOnlyList<CivicCivilizationEffectDefinition> EffectsFor(string civilizationId) => content.Effects.Where(item => item.CivilizationId == civilizationId).ToArray();
+        public IReadOnlyList<CivicCivilizationStartDefinition> StartsFor(string civilizationId) => content.Starts.Where(item => item.CivilizationId == civilizationId).ToArray();
 
         public override void Initialize(CivicModuleContext context)
         {

@@ -354,6 +354,18 @@ namespace Civic.UI.Tests
         }
 
         [Test]
+        public void TechnologyEffectSummariesArePrecomputedAndReusedAcrossSnapshots()
+        {
+            var simulation = new CivicGameSimulation(LoadDefaultData());
+            var before = simulation.Snapshot.Technologies.Single(technology => technology.Id == "power_grid").EffectSummary;
+
+            simulation.Advance(1d);
+
+            var after = simulation.Snapshot.Technologies.Single(technology => technology.Id == "power_grid").EffectSummary;
+            Assert.That(ReferenceEquals(before, after), Is.True);
+        }
+
+        [Test]
         public void PopulationProducingBuildingsCanBuildAtPopulationCap()
         {
             var simulation = new CivicGameSimulation(LoadDefaultData());

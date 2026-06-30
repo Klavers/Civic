@@ -147,9 +147,11 @@ namespace Civic.Editor.UI
                 subtitle.color = new Color(0.68f, 0.76f, 0.86f, 1f);
                 SetRect(subtitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -170f), new Vector2(620f, 48f));
                 var openFeaturePanelButton = CreateButton(mainPanel.transform, "OpenFeaturePanelButton", "새 게임 / 모듈 설정");
-                SetRect(openFeaturePanelButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -35f), new Vector2(420f, 72f));
+                SetRect(openFeaturePanelButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 30f), new Vector2(420f, 72f));
+                var openOptionsPanelButton = CreateButton(mainPanel.transform, "OpenOptionsPanelButton", "옵션");
+                SetRect(openOptionsPanelButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -65f), new Vector2(420f, 72f));
                 var quitButton = CreateButton(mainPanel.transform, "QuitButton", "종료");
-                SetRect(quitButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -130f), new Vector2(420f, 72f));
+                SetRect(quitButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -160f), new Vector2(420f, 72f));
 
                 var featurePanel = GetOrCreateChild(background.transform, "FeaturePanel", typeof(RectTransform), typeof(Image));
                 SetRect(featurePanel.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1180f, 940f));
@@ -188,6 +190,19 @@ namespace Civic.Editor.UI
                 var startButton = CreateButton(featurePanel.transform, "StartGameButton", "이 구성으로 시작");
                 SetRect(startButton.GetComponent<RectTransform>(), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-205f, 50f), new Vector2(350f, 64f));
 
+                var optionsPanel = GetOrCreateChild(background.transform, "OptionsPanel", typeof(RectTransform), typeof(Image));
+                SetRect(optionsPanel.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(760f, 520f));
+                optionsPanel.GetComponent<Image>().color = new Color(0.07f, 0.10f, 0.14f, 0.99f);
+                var optionsTitle = CreateText(optionsPanel.transform, "TitleLabel", "옵션", 36, TextAnchor.MiddleCenter);
+                SetRect(optionsTitle.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(32f, -70f), new Vector2(-64f, 64f));
+                var deleteStatus = CreateText(optionsPanel.transform, "DeleteSaveDataStatusLabel", "메타 진행, 환생 포인트, 도전과제, 도감 기록을 삭제합니다.", 18, TextAnchor.MiddleCenter);
+                SetRect(deleteStatus.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(40f, 72f), new Vector2(-80f, 80f));
+                var deleteSaveButton = CreateButton(optionsPanel.transform, "DeleteSaveDataButton", "세이브데이터 삭제");
+                SetRect(deleteSaveButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -32f), new Vector2(360f, 68f));
+                deleteSaveButton.GetComponent<Image>().color = new Color(0.54f, 0.19f, 0.18f, 1f);
+                var optionsBackButton = CreateButton(optionsPanel.transform, "BackButton", "뒤로");
+                SetRect(optionsBackButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 58f), new Vector2(280f, 62f));
+
                 var eventSystemObject = GetOrCreateChild(root.transform, "EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
                 eventSystemObject.GetComponent<EventSystem>().sendNavigationEvents = true;
 
@@ -195,8 +210,13 @@ namespace Civic.Editor.UI
                 var serialized = new SerializedObject(controller);
                 serialized.FindProperty("mainPanel").objectReferenceValue = mainPanel;
                 serialized.FindProperty("featurePanel").objectReferenceValue = featurePanel;
+                serialized.FindProperty("optionsPanel").objectReferenceValue = optionsPanel;
                 serialized.FindProperty("openFeaturePanelButton").objectReferenceValue = openFeaturePanelButton;
+                serialized.FindProperty("openOptionsPanelButton").objectReferenceValue = openOptionsPanelButton;
                 serialized.FindProperty("backButton").objectReferenceValue = backButton;
+                serialized.FindProperty("optionsBackButton").objectReferenceValue = optionsBackButton;
+                serialized.FindProperty("deleteSaveDataButton").objectReferenceValue = deleteSaveButton;
+                serialized.FindProperty("deleteSaveDataStatusLabel").objectReferenceValue = deleteStatus;
                 serialized.FindProperty("startGameButton").objectReferenceValue = startButton;
                 serialized.FindProperty("quitButton").objectReferenceValue = quitButton;
                 AssignArray(serialized, "featureRows", rows);
@@ -211,6 +231,7 @@ namespace Civic.Editor.UI
                 serialized.ApplyModifiedPropertiesWithoutUndo();
 
                 featurePanel.SetActive(false);
+                optionsPanel.SetActive(false);
                 return PrefabUtility.SaveAsPrefabAsset(root, assetPath);
             }
             finally

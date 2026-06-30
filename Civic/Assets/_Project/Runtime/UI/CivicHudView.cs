@@ -39,6 +39,8 @@ namespace Civic.UI
         [SerializeField] private Text rightResourcesLabel;
         [SerializeField] private Text detailTitleLabel;
         [SerializeField] private Text detailBodyLabel;
+        [SerializeField] private GameObject detailPanelRoot;
+        [SerializeField] private Button detailCloseButton;
         [SerializeField] private GameObject resourceDetailPanel;
         [SerializeField] private GameObject buildingDetailPanel;
         [SerializeField] private GameObject technologyDetailPanel;
@@ -75,6 +77,7 @@ namespace Civic.UI
         public event Action ResourcesPanelRequested;
         public event Action BuildingsPanelRequested;
         public event Action TechnologiesPanelRequested;
+        public event Action DetailPanelCloseRequested;
         public event Action<string> BuildRequested;
         public event Action<string> ResearchRequested;
         public event Action<string> EraTabRequested;
@@ -94,6 +97,8 @@ namespace Civic.UI
             rightResourcesLabel != null &&
             detailTitleLabel != null &&
             detailBodyLabel != null &&
+            detailPanelRoot != null &&
+            detailCloseButton != null &&
             resourceDetailPanel != null &&
             buildingDetailPanel != null &&
             technologyDetailPanel != null &&
@@ -111,6 +116,8 @@ namespace Civic.UI
         public Button ResourcesPanelButton => resourcesPanelButton;
         public Button BuildingsPanelButton => buildingsPanelButton;
         public Button TechnologiesPanelButton => technologiesPanelButton;
+        public GameObject DetailPanelRoot => detailPanelRoot;
+        public Button DetailCloseButton => detailCloseButton;
         public IReadOnlyList<GameObject> ResourceDetailRows => resourceDetailRows ?? Array.Empty<GameObject>();
         public IReadOnlyList<Text> ResourceSummaryLabels => resourceSummaryLabels ?? Array.Empty<Text>();
         public IReadOnlyList<GameObject> ResourceProducerBoxes => resourceProducerBoxes ?? Array.Empty<GameObject>();
@@ -139,6 +146,7 @@ namespace Civic.UI
             resourcesPanelButton?.onClick.AddListener(NotifyResourcesPanelRequested);
             buildingsPanelButton?.onClick.AddListener(NotifyBuildingsPanelRequested);
             technologiesPanelButton?.onClick.AddListener(NotifyTechnologiesPanelRequested);
+            detailCloseButton?.onClick.AddListener(NotifyDetailPanelCloseRequested);
             foodToggleButton?.onClick.AddListener(NotifyFoodToggleRequested);
             BindActionButtons();
         }
@@ -148,6 +156,7 @@ namespace Civic.UI
             resourcesPanelButton?.onClick.RemoveListener(NotifyResourcesPanelRequested);
             buildingsPanelButton?.onClick.RemoveListener(NotifyBuildingsPanelRequested);
             technologiesPanelButton?.onClick.RemoveListener(NotifyTechnologiesPanelRequested);
+            detailCloseButton?.onClick.RemoveListener(NotifyDetailPanelCloseRequested);
             foodToggleButton?.onClick.RemoveListener(NotifyFoodToggleRequested);
             ClearActionButtons(buildingActionButtons);
             ClearActionButtons(eraTabButtons);
@@ -213,6 +222,7 @@ namespace Civic.UI
 
         private void RenderDetail(CivicGameSnapshot snapshot, CivicHudPanelMode panelMode, string selectedTechnologyEraId)
         {
+            detailPanelRoot.SetActive(panelMode != CivicHudPanelMode.None);
             detailBodyLabel.gameObject.SetActive(false);
             resourceDetailPanel.SetActive(panelMode == CivicHudPanelMode.Resources);
             buildingDetailPanel.SetActive(panelMode == CivicHudPanelMode.Buildings);
@@ -240,6 +250,12 @@ namespace Civic.UI
                     RenderBuildingActionButtons(snapshot, false);
                     RenderEraTabs(snapshot, true, selectedTechnologyEraId);
                     RenderTechnologyActionButtons(snapshot, true, selectedTechnologyEraId);
+                    break;
+                case CivicHudPanelMode.None:
+                    RenderResourceDetailRows(null);
+                    RenderBuildingActionButtons(snapshot, false);
+                    RenderEraTabs(snapshot, false, selectedTechnologyEraId);
+                    RenderTechnologyActionButtons(snapshot, false, selectedTechnologyEraId);
                     break;
                 default:
                     detailTitleLabel.text = "자원 상세";
@@ -1001,6 +1017,7 @@ namespace Civic.UI
         private void NotifyResourcesPanelRequested() => ResourcesPanelRequested?.Invoke();
         private void NotifyBuildingsPanelRequested() => BuildingsPanelRequested?.Invoke();
         private void NotifyTechnologiesPanelRequested() => TechnologiesPanelRequested?.Invoke();
+        private void NotifyDetailPanelCloseRequested() => DetailPanelCloseRequested?.Invoke();
         private void NotifyBuildRequested(int index)
         {
             if (index >= 0 && index < currentBuildingActionIds.Length && !string.IsNullOrEmpty(currentBuildingActionIds[index]))
@@ -1063,6 +1080,7 @@ namespace Civic.UI
 
     public enum CivicHudPanelMode
     {
+        None,
         Resources,
         Buildings,
         Technologies,

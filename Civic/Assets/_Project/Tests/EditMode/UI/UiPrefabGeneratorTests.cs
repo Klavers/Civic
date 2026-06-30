@@ -44,8 +44,16 @@ namespace Civic.UI.Tests
             Assert.That(controller.HasRequiredReferences, Is.True);
             Assert.That(modulePanel.HasRequiredReferences, Is.True);
             Assert.That(modulePanel.DomainPanels.Count, Is.EqualTo(CivicFeatureRegistry.Features.Count));
-            Assert.That(modulePanel.Rows.Count, Is.EqualTo(18 * CivicFeatureRegistry.Features.Count));
+            Assert.That(modulePanel.Rows.Count, Is.EqualTo(202));
+            Assert.That(modulePanel.Rows.All(row => row.DescriptionRoot != null && row.DescriptionLabel != null), Is.True);
             Assert.That(modulePanel.DomainPanels.Select(item => item.FeatureId), Is.EquivalentTo(CivicFeatureRegistry.Features.Select(item => item.Id)));
+            var politicsPanel = modulePanel.DomainPanels.Single(item => item.FeatureId == CivicFeatureRegistry.Politics);
+            Assert.That(politicsPanel.CategoryTabRows.Count, Is.EqualTo(8));
+            Assert.That(politicsPanel.CategoryTabButtons.Count, Is.EqualTo(8));
+            Assert.That(politicsPanel.CategoryTabLabels.Count, Is.EqualTo(8));
+            var nationPanel = modulePanel.DomainPanels.Single(item => item.FeatureId == CivicFeatureRegistry.NationFormation);
+            Assert.That(nationPanel.ImpossibleFilterRoot, Is.Not.Null);
+            Assert.That(nationPanel.ImpossibleFilterToggle, Is.Not.Null);
             Assert.That(view.ResourceDetailRows.Count, Is.EqualTo(30));
             Assert.That(view.ResourceSummaryLabels.Count, Is.EqualTo(30));
             Assert.That(view.ResourceProducerBoxes.Count, Is.EqualTo(120));
@@ -87,6 +95,8 @@ namespace Civic.UI.Tests
             Assert.That(view.TechnologyActionInfoLabels, Has.All.Not.Null);
             Assert.That(view.TechnologyActionButtons, Has.All.Not.Null);
             Assert.That(view.FoodToggleButton, Is.Not.Null);
+            Assert.That(view.DetailPanelRoot, Is.Not.Null);
+            Assert.That(view.DetailCloseButton, Is.Not.Null);
             Assert.That(view.TooltipView, Is.Not.Null);
             Assert.That(view.TooltipView.HasRequiredReferences, Is.True);
             Assert.That(
@@ -125,7 +135,18 @@ namespace Civic.UI.Tests
             Assert.That(CountChildrenNamed(hudBase, "DomainPanel08"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "DomainActionRow01"), Is.EqualTo(8));
             Assert.That(CountChildrenNamed(hudBase, "DomainActionRow18"), Is.EqualTo(8));
+            Assert.That(CountChildrenNamed(hudBase, "DomainActionRow24"), Is.EqualTo(3));
+            Assert.That(CountChildrenNamed(hudBase, "DomainActionRow64"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "CategoryTabArea"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "CategoryTab01"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "CategoryTab08"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "ImpossibleFilter"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "Description"), Is.EqualTo(202));
             Assert.That(CountChildrenNamed(hudBase, "ModuleActionRow01"), Is.Zero);
+            Assert.That(CountChildrenNamed(hudBase, "DetailCloseButton"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "ExitPopup"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "EventPopup"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "DebugPanel"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "ResourceDetailRow01"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "ResourceDetailRow06"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "ResourceDetailRow30"), Is.EqualTo(1));

@@ -87,6 +87,44 @@ namespace Civic.Simulation.Modules.Tests
             Assert.That(runtime.Telemetry.GetMetric("snapshot.livingStandard", runtime.MetaProgress), Is.EqualTo(politics.LivingStandard).Within(1e-9d));
         }
 
+        [Test]
+        public void AchievementPermanentRewards_ApplyForCompletedMetaOnlyWhenModuleEnabled()
+        {
+            var content = CivicModuleContentLoader.LoadFromResources();
+            var rewards = CivicAchievementRewardContentLoader.LoadFromResources(content.Achievements);
+            Assert.That(rewards.Count, Is.EqualTo(10));
+            var progress = new CivicMetaProgress();
+            progress.CompletedAchievementIds.Add("heart_of_industry");
+
+            var enabledSimulation = new CivicGameSimulation(gameData);
+            new CivicModuleRuntime(
+                enabledSimulation,
+                CivicFeatureResolver.Resolve(new[] { CivicFeatureRegistry.Achievements }),
+                new CivicInMemoryMetaProgressStore(progress),
+                content,
+                achievementRewards: rewards);
+            Assert.That(enabledSimulation.Modifiers.Additive(CivicModifierEffectTypes.ResourceGdpMultiplier, "wheat"), Is.EqualTo(0.02d).Within(1e-9d));
+
+            var disabledSimulation = new CivicGameSimulation(gameData);
+            new CivicModuleRuntime(disabledSimulation, CivicFeatureResolver.Resolve(Array.Empty<string>()), new CivicInMemoryMetaProgressStore(progress));
+            Assert.That(disabledSimulation.Modifiers.Additive(CivicModifierEffectTypes.ResourceGdpMultiplier, "wheat"), Is.Zero);
+        }
+
+        [Test]
+        public void Politics_HasExactlyOneActiveInstitutionPerCategoryAndMultipleCategoriesAtOnce()
+        {
+            var runtime = new CivicModuleRuntime(
+                new CivicGameSimulation(gameData),
+                CivicFeatureResolver.Resolve(new[] { CivicFeatureRegistry.Politics }));
+            var politics = runtime.GetModule<CivicPoliticsModule>(CivicFeatureRegistry.Politics);
+            var categories = politics.Definitions.Select(item => item.Category).Distinct(StringComparer.Ordinal).ToArray();
+
+            Assert.That(categories.Length, Is.EqualTo(5));
+            Assert.That(politics.ActiveByCategory.Count, Is.EqualTo(categories.Length));
+            Assert.That(categories.All(category => politics.Definitions.Count(item => item.Category == category && politics.ActiveByCategory[category] == item.Id) == 1), Is.True);
+            Assert.That(politics.ActiveByCategory.Values.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(categories.Length));
+        }
+
         private static bool IsPlanned(CivicCivilizationEffectDefinition item) => item.EffectType == CivicProvisionalEffect.Planned;
         private static bool IsPlanned(CivicInstitutionEffectDefinition item) => item.EffectType == CivicProvisionalEffect.Planned;
         private static bool IsPlanned(CivicNationEffectDefinition item) => item.EffectType == CivicProvisionalEffect.Planned;

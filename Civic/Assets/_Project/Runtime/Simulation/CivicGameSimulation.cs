@@ -52,12 +52,14 @@ namespace Civic.Simulation
 
         private double tickAccumulatorSeconds;
         private CivicGameSnapshot lastSnapshot;
+        private readonly IReadOnlyDictionary<string, string> technologyEffectSummaries;
 
         public CivicGameSimulation(CivicGameData data)
         {
             Data = data ?? throw new ArgumentNullException(nameof(data));
             State = new CivicGameState(data);
             Modifiers = new CivicModifierLedger();
+            technologyEffectSummaries = CreateTechnologyEffectSummaries();
             SetResource(PopulationId, CalculateEffectivePopulation(Array.Empty<CivicPopulationConsumptionSnapshot>(), CivicNumber.Zero));
             lastSnapshot = CalculateSnapshot();
             SetResource(PopulationId, lastSnapshot.Population);
@@ -692,7 +694,7 @@ namespace Civic.Simulation
                 State.ResearchedTechnologyIds.Contains(technology.Id),
                 CanResearch(technology),
                 technology.EraId,
-                BuildTechnologyEffectSummary(technology.Id));
+                GetTechnologyEffectSummary(technology.Id));
         }
 
         private Dictionary<string, CivicNumber> CalculatePrices(IReadOnlyDictionary<string, CivicNumber> demand, IReadOnlyDictionary<string, CivicNumber> produced)
@@ -1266,21 +1268,52 @@ namespace Civic.Simulation
                 isOutput));
         }
 
-        private string BuildTechnologyEffectSummary(string technologyId)
+        private string GetTechnologyEffectSummary(string technologyId)
         {
-            var summaries = Data.Resources
-                .Where(resource => resource.RequiredTechnologyId == technologyId)
-                .Select(resource => $"자원 {resource.DisplayNameKo} 해금")
-                .Concat(Data.Buildings
-                    .Where(building => building.UnlockedByTechnologyId == technologyId)
-                    .Select(building => $"건물 {building.DisplayNameKo} 해금"))
-                .Concat(TechnologyEffectsFor(technologyId)
-                .Select(FormatTechnologyEffectSummary)
-                .Where(summary => !string.IsNullOrEmpty(summary)))
-                .ToArray();
-            return summaries.Length == 0
-                ? "효과 없음"
-                : string.Join("; ", summaries);
+            return technologyEffectSummaries.TryGetValue(technologyId, out var summary)
+                ? summary
+                : "효과 없음";
+        }
+
+        private IReadOnlyDictionary<string, string> CreateTechnologyEffectSummaries()
+        {
+            var summaryPartsByTechnologyId = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            foreach (var technology in Data.Technologies)
+            {
+                summaryPartsByTechnologyId[technology.Id] = new List<string>();
+            }
+
+            foreach (var resource in Data.Resources)
+            {
+                if (summaryPartsByTechnologyId.TryGetValue(resource.RequiredTechnologyId, out var parts))
+                {
+                    parts.Add($"자원 {resource.DisplayNameKo} 해금");
+                }
+            }
+
+            foreach (var building in Data.Buildings)
+            {
+                if (summaryPartsByTechnologyId.TryGetValue(building.UnlockedByTechnologyId, out var parts))
+                {
+                    parts.Add($"건물 {building.DisplayNameKo} 해금");
+                }
+            }
+
+            foreach (var effect in Data.TechnologyEffects)
+            {
+                if (!summaryPartsByTechnologyId.TryGetValue(effect.TechnologyId, out var parts)) continue;
+                var summary = FormatTechnologyEffectSummary(effect);
+                if (!string.IsNullOrEmpty(summary)) parts.Add(summary);
+            }
+
+            var summaries = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var technology in Data.Technologies)
+            {
+                var parts = summaryPartsByTechnologyId[technology.Id];
+                summaries[technology.Id] = parts.Count == 0 ? "효과 없음" : string.Join("; ", parts);
+            }
+
+            return summaries;
         }
 
         private string FormatTechnologyEffectSummary(TechnologyEffectDefinition effect)

@@ -169,6 +169,14 @@ namespace Civic.Editor.UI
                 detailTitle.fontSize = 26;
                 detailTitle.alignment = TextAnchor.MiddleLeft;
                 SetRect(detailTitle.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(16f, -34f), new Vector2(-32f, 50f));
+                var detailCloseButton = GetOrCreateButton(detailPanel.transform, "DetailCloseButton");
+                SetRect(detailCloseButton.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-70f, -34f), new Vector2(100f, 44f));
+                detailCloseButton.GetComponent<Image>().color = new Color(0.24f, 0.29f, 0.36f, 1f);
+                var detailCloseLabel = GetOrCreateText(detailCloseButton.transform, "Label");
+                detailCloseLabel.text = "닫기";
+                detailCloseLabel.fontSize = 17;
+                detailCloseLabel.alignment = TextAnchor.MiddleCenter;
+                SetRect(detailCloseLabel.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
                 var detailBody = GetOrCreateText(detailPanel.transform, "DetailBodyLabel");
                 detailBody.text = "데이터 로드 대기";
                 detailBody.fontSize = 18;
@@ -229,7 +237,8 @@ namespace Civic.Editor.UI
                 rightResources.alignment = TextAnchor.UpperLeft;
                 SetRect(rightResources.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(18f, -48f), new Vector2(-36f, -96f));
                 var foodToggleButton = CreateActionButton(rightPanel.transform, "FoodToggleButton", "식량 펼침", new Vector2(0f, 34f));
-                var modulePanelView = CreateModulePanel(root, modulesButton, tooltipView, 18);
+                var modulePanelView = CreateModulePanel(root, modulesButton, tooltipView);
+                var overlayView = CreateHudOverlayView(root, tooltipView);
                 tooltipView.transform.SetAsLastSibling();
 
                 var view = GetOrAdd<CivicHudView>(root);
@@ -247,6 +256,8 @@ namespace Civic.Editor.UI
                 viewObject.FindProperty("rightResourcesLabel").objectReferenceValue = rightResources;
                 viewObject.FindProperty("detailTitleLabel").objectReferenceValue = detailTitle;
                 viewObject.FindProperty("detailBodyLabel").objectReferenceValue = detailBody;
+                viewObject.FindProperty("detailPanelRoot").objectReferenceValue = detailPanel;
+                viewObject.FindProperty("detailCloseButton").objectReferenceValue = detailCloseButton;
                 viewObject.FindProperty("resourceDetailPanel").objectReferenceValue = resourcePanel;
                 viewObject.FindProperty("buildingDetailPanel").objectReferenceValue = buildingPanel;
                 viewObject.FindProperty("technologyDetailPanel").objectReferenceValue = technologyPanel;
@@ -283,6 +294,7 @@ namespace Civic.Editor.UI
                 controllerObject.FindProperty("dataSource").objectReferenceValue = dataSource;
                 controllerObject.FindProperty("simulationSpeed").doubleValue = 1d;
                 controllerObject.FindProperty("modulePanelView").objectReferenceValue = modulePanelView;
+                controllerObject.FindProperty("overlayView").objectReferenceValue = overlayView;
                 controllerObject.ApplyModifiedPropertiesWithoutUndo();
 
                 return PrefabUtility.SaveAsPrefabAsset(root, assetPath);
@@ -768,7 +780,7 @@ namespace Civic.Editor.UI
             return button;
         }
 
-        private static CivicModulePanelView CreateModulePanel(GameObject root, Button openButton, CivicTooltipView tooltipView, int rowCount)
+        private static CivicModulePanelView CreateModulePanel(GameObject root, Button openButton, CivicTooltipView tooltipView)
         {
             var panel = GetOrCreateChild(root.transform, "ModulePanel", typeof(RectTransform), typeof(Image));
             SetRect(panel.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(640f, -36f), new Vector2(1040f, -140f));
@@ -817,7 +829,11 @@ namespace Civic.Editor.UI
             var domainPanels = new CivicDomainPanelView[CivicFeatureRegistry.Features.Count];
             for (var index = 0; index < domainPanels.Length; index++)
             {
-                domainPanels[index] = CreateDomainPanel(panel.transform, CivicFeatureRegistry.Features[index], tooltipView, rowCount, index);
+                var definition = CivicFeatureRegistry.Features[index];
+                var rowCount = definition.Id == CivicFeatureRegistry.Events ? 64
+                    : definition.Id == CivicFeatureRegistry.Politics || definition.Id == CivicFeatureRegistry.GreatPeople ? 24
+                    : 18;
+                domainPanels[index] = CreateDomainPanel(panel.transform, definition, tooltipView, rowCount, index);
             }
 
             var view = GetOrAdd<CivicModulePanelView>(root);
@@ -829,9 +845,156 @@ namespace Civic.Editor.UI
             AssignObjectArray(serialized, "tabButtons", tabButtons);
             AssignObjectArray(serialized, "tabLabels", tabLabels);
             AssignObjectArray(serialized, "domainPanels", domainPanels);
+            serialized.FindProperty("tooltipView").objectReferenceValue = tooltipView;
             serialized.ApplyModifiedPropertiesWithoutUndo();
             panel.SetActive(false);
             return view;
+        }
+
+        private static CivicHudOverlayView CreateHudOverlayView(GameObject root, CivicTooltipView tooltipView)
+        {
+            var eventAlertButton = GetOrCreateButton(root.transform, "EventAlertButton");
+            SetRect(eventAlertButton.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -94f), new Vector2(220f, 46f));
+            eventAlertButton.GetComponent<Image>().color = new Color(0.55f, 0.24f, 0.18f, 1f);
+            var eventAlertLabel = GetOrCreateText(eventAlertButton.transform, "Label");
+            eventAlertLabel.text = "이벤트";
+            eventAlertLabel.fontSize = 18;
+            eventAlertLabel.alignment = TextAnchor.MiddleCenter;
+            SetRect(eventAlertLabel.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+            var exitPopup = CreateModalPanel(root.transform, "ExitPopup", new Vector2(520f, 300f));
+            var exitTitle = GetOrCreateText(exitPopup.transform, "TitleLabel");
+            exitTitle.text = "게임 메뉴";
+            exitTitle.fontSize = 30;
+            exitTitle.alignment = TextAnchor.MiddleCenter;
+            SetRect(exitTitle.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(20f, -54f), new Vector2(-40f, 60f));
+            var exitNotice = GetOrCreateText(exitPopup.transform, "NoticeLabel");
+            exitNotice.text = "메인 메뉴로 이동하면 현재 런은 종료됩니다.";
+            exitNotice.fontSize = 18;
+            exitNotice.alignment = TextAnchor.MiddleCenter;
+            SetRect(exitNotice.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(20f, 32f), new Vector2(-40f, 60f));
+            var continueButton = CreateModalButton(exitPopup.transform, "ContinueButton", "계속 플레이", new Vector2(-125f, -86f), new Vector2(220f, 58f));
+            var mainMenuButton = CreateModalButton(exitPopup.transform, "MainMenuButton", "메인 메뉴로", new Vector2(125f, -86f), new Vector2(220f, 58f));
+
+            var eventPopup = CreateModalPanel(root.transform, "EventPopup", new Vector2(860f, 580f));
+            var eventTitle = GetOrCreateText(eventPopup.transform, "TitleLabel");
+            eventTitle.text = "이벤트";
+            eventTitle.fontSize = 30;
+            eventTitle.alignment = TextAnchor.MiddleLeft;
+            SetRect(eventTitle.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(32f, -48f), new Vector2(-110f, 58f));
+            var eventCloseButton = CreateModalButton(eventPopup.transform, "CloseButton", "닫기", new Vector2(370f, 244f), new Vector2(100f, 46f));
+            var eventCause = GetOrCreateText(eventPopup.transform, "CauseLabel");
+            eventCause.text = "발생 원인";
+            eventCause.fontSize = 16;
+            eventCause.color = new Color(0.74f, 0.80f, 0.88f, 1f);
+            eventCause.alignment = TextAnchor.MiddleLeft;
+            SetRect(eventCause.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(32f, -100f), new Vector2(-64f, 40f));
+            var eventDescription = GetOrCreateText(eventPopup.transform, "DescriptionLabel");
+            eventDescription.text = "이벤트 설명";
+            eventDescription.fontSize = 19;
+            eventDescription.alignment = TextAnchor.UpperLeft;
+            SetRect(eventDescription.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 1f), new Vector2(32f, -154f), new Vector2(-64f, -156f));
+            var eventChoiceButtons = new Button[3];
+            var eventChoiceLabels = new Text[3];
+            var eventChoiceTooltips = new CivicTooltipTrigger[3];
+            for (var index = 0; index < 3; index++)
+            {
+                var button = CreateModalButton(eventPopup.transform, $"ChoiceButton{index + 1:00}", $"선택지 {index + 1}", new Vector2(0f, 70f - index * 82f), new Vector2(780f, 64f));
+                var trigger = GetOrAdd<CivicTooltipTrigger>(button.gameObject);
+                trigger.AssignTooltipView(tooltipView);
+                eventChoiceButtons[index] = button;
+                eventChoiceLabels[index] = button.transform.Find("Label").GetComponent<Text>();
+                eventChoiceTooltips[index] = trigger;
+            }
+
+            var debugPanel = CreateModalPanel(root.transform, "DebugPanel", new Vector2(760f, 500f));
+            var debugTitle = GetOrCreateText(debugPanel.transform, "TitleLabel");
+            debugTitle.text = "DEBUG · Backquote(`)";
+            debugTitle.fontSize = 28;
+            debugTitle.alignment = TextAnchor.MiddleLeft;
+            SetRect(debugTitle.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(28f, -48f), new Vector2(-120f, 56f));
+            var debugCloseButton = CreateModalButton(debugPanel.transform, "CloseButton", "닫기", new Vector2(320f, 210f), new Vector2(100f, 44f));
+            var previousDomain = CreateModalButton(debugPanel.transform, "PreviousDomainButton", "◀", new Vector2(-285f, 125f), new Vector2(56f, 48f));
+            var nextDomain = CreateModalButton(debugPanel.transform, "NextDomainButton", "▶", new Vector2(285f, 125f), new Vector2(56f, 48f));
+            var domainLabel = GetOrCreateText(debugPanel.transform, "DomainLabel");
+            domainLabel.text = "모듈";
+            domainLabel.fontSize = 22;
+            domainLabel.alignment = TextAnchor.MiddleCenter;
+            SetRect(domainLabel.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 125f), new Vector2(500f, 48f));
+            var previousTarget = CreateModalButton(debugPanel.transform, "PreviousTargetButton", "◀", new Vector2(-285f, 55f), new Vector2(56f, 48f));
+            var nextTarget = CreateModalButton(debugPanel.transform, "NextTargetButton", "▶", new Vector2(285f, 55f), new Vector2(56f, 48f));
+            var targetLabel = GetOrCreateText(debugPanel.transform, "TargetLabel");
+            targetLabel.text = "대상";
+            targetLabel.fontSize = 20;
+            targetLabel.alignment = TextAnchor.MiddleCenter;
+            SetRect(targetLabel.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 55f), new Vector2(500f, 48f));
+            var debugDescription = GetOrCreateText(debugPanel.transform, "DescriptionLabel");
+            debugDescription.text = "활성 모듈의 테스트 상태를 강제로 준비합니다.";
+            debugDescription.fontSize = 17;
+            debugDescription.alignment = TextAnchor.UpperLeft;
+            SetRect(debugDescription.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0.5f), new Vector2(48f, 92f), new Vector2(-96f, -32f));
+            var debugActionButton = CreateModalButton(debugPanel.transform, "ActionButton", "실행", new Vector2(0f, -190f), new Vector2(300f, 58f));
+            var debugActionLabel = debugActionButton.transform.Find("Label").GetComponent<Text>();
+
+            var view = GetOrAdd<CivicHudOverlayView>(root);
+            var serialized = new SerializedObject(view);
+            serialized.FindProperty("exitPopupRoot").objectReferenceValue = exitPopup;
+            serialized.FindProperty("continueButton").objectReferenceValue = continueButton;
+            serialized.FindProperty("mainMenuButton").objectReferenceValue = mainMenuButton;
+            serialized.FindProperty("eventAlertButton").objectReferenceValue = eventAlertButton;
+            serialized.FindProperty("eventAlertLabel").objectReferenceValue = eventAlertLabel;
+            serialized.FindProperty("eventPopupRoot").objectReferenceValue = eventPopup;
+            serialized.FindProperty("eventTitleLabel").objectReferenceValue = eventTitle;
+            serialized.FindProperty("eventDescriptionLabel").objectReferenceValue = eventDescription;
+            serialized.FindProperty("eventCauseLabel").objectReferenceValue = eventCause;
+            serialized.FindProperty("eventCloseButton").objectReferenceValue = eventCloseButton;
+            AssignObjectArray(serialized, "eventChoiceButtons", eventChoiceButtons);
+            AssignObjectArray(serialized, "eventChoiceLabels", eventChoiceLabels);
+            AssignObjectArray(serialized, "eventChoiceTooltips", eventChoiceTooltips);
+            serialized.FindProperty("debugPanelRoot").objectReferenceValue = debugPanel;
+            serialized.FindProperty("debugPreviousDomainButton").objectReferenceValue = previousDomain;
+            serialized.FindProperty("debugNextDomainButton").objectReferenceValue = nextDomain;
+            serialized.FindProperty("debugDomainLabel").objectReferenceValue = domainLabel;
+            serialized.FindProperty("debugPreviousTargetButton").objectReferenceValue = previousTarget;
+            serialized.FindProperty("debugNextTargetButton").objectReferenceValue = nextTarget;
+            serialized.FindProperty("debugTargetLabel").objectReferenceValue = targetLabel;
+            serialized.FindProperty("debugDescriptionLabel").objectReferenceValue = debugDescription;
+            serialized.FindProperty("debugActionButton").objectReferenceValue = debugActionButton;
+            serialized.FindProperty("debugActionLabel").objectReferenceValue = debugActionLabel;
+            serialized.FindProperty("debugCloseButton").objectReferenceValue = debugCloseButton;
+            serialized.FindProperty("tooltipView").objectReferenceValue = tooltipView;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            eventAlertButton.gameObject.SetActive(false);
+            exitPopup.SetActive(false);
+            eventPopup.SetActive(false);
+            debugPanel.SetActive(false);
+            exitPopup.transform.SetAsLastSibling();
+            eventPopup.transform.SetAsLastSibling();
+            debugPanel.transform.SetAsLastSibling();
+            return view;
+        }
+
+        private static GameObject CreateModalPanel(Transform parent, string name, Vector2 size)
+        {
+            var panel = GetOrCreateChild(parent, name, typeof(RectTransform), typeof(Image));
+            SetRect(panel.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, size);
+            panel.GetComponent<Image>().color = new Color(0.055f, 0.075f, 0.105f, 0.995f);
+            return panel;
+        }
+
+        private static Button CreateModalButton(Transform parent, string name, string label, Vector2 position, Vector2 size)
+        {
+            var button = GetOrCreateButton(parent, name);
+            SetRect(button.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), position, size);
+            button.GetComponent<Image>().color = new Color(0.20f, 0.36f, 0.58f, 1f);
+            ConfigureButtonColors(button);
+            var text = GetOrCreateText(button.transform, "Label");
+            text.text = label;
+            text.fontSize = 18;
+            text.alignment = TextAnchor.MiddleCenter;
+            SetRect(text.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            return button;
         }
 
         private static CivicDomainPanelView CreateDomainPanel(
@@ -857,7 +1020,70 @@ namespace Civic.Editor.UI
             status.alignment = TextAnchor.MiddleLeft;
             SetRect(status.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, -66f), new Vector2(-36f, 30f));
 
-            var scroll = CreateScrollArea(root.transform, "DomainScroll", rowCount * 72f, 92f);
+            GameObject categoryTabRoot = null;
+            var categoryTabRows = Array.Empty<GameObject>();
+            var categoryTabButtons = Array.Empty<Button>();
+            var categoryTabLabels = Array.Empty<Text>();
+            if (definition.Id == CivicFeatureRegistry.Politics)
+            {
+                const int categoryTabCapacity = 8;
+                categoryTabRoot = GetOrCreateChild(root.transform, "CategoryTabArea", typeof(RectTransform));
+                SetRect(categoryTabRoot.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -116f), new Vector2(-36f, 52f));
+                categoryTabRows = new GameObject[categoryTabCapacity];
+                categoryTabButtons = new Button[categoryTabCapacity];
+                categoryTabLabels = new Text[categoryTabCapacity];
+                for (var index = 0; index < categoryTabCapacity; index++)
+                {
+                    var tab = GetOrCreateChild(categoryTabRoot.transform, $"CategoryTab{index + 1:00}", typeof(RectTransform), typeof(Image), typeof(Button));
+                    SetRect(tab.GetComponent<RectTransform>(), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(98f + index * 196f, 0f), new Vector2(188f, 46f));
+                    tab.GetComponent<Image>().color = new Color(0.18f, 0.29f, 0.42f, 1f);
+                    var button = tab.GetComponent<Button>();
+                    button.targetGraphic = tab.GetComponent<Image>();
+                    ConfigureButtonColors(button);
+                    var label = GetOrCreateText(tab.transform, "Label");
+                    label.text = "정치 그룹";
+                    label.fontSize = 13;
+                    label.alignment = TextAnchor.MiddleCenter;
+                    SetRect(label.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+                    categoryTabRows[index] = tab;
+                    categoryTabButtons[index] = button;
+                    categoryTabLabels[index] = label;
+                }
+            }
+
+            GameObject impossibleFilterRoot = null;
+            Toggle impossibleFilterToggle = null;
+            Text impossibleFilterLabel = null;
+            if (definition.Id == CivicFeatureRegistry.NationFormation)
+            {
+                impossibleFilterRoot = GetOrCreateChild(root.transform, "ImpossibleFilter", typeof(RectTransform));
+                SetRect(impossibleFilterRoot.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -116f), new Vector2(-36f, 44f));
+                var toggleObject = GetOrCreateChild(impossibleFilterRoot.transform, "Toggle", typeof(RectTransform), typeof(Image), typeof(Toggle));
+                SetRect(toggleObject.GetComponent<RectTransform>(), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(30f, 0f), new Vector2(28f, 28f));
+                var toggleImage = toggleObject.GetComponent<Image>();
+                toggleImage.color = new Color(0.16f, 0.24f, 0.34f, 1f);
+                var checkmark = GetOrCreateChild(toggleObject.transform, "Checkmark", typeof(RectTransform), typeof(Image));
+                SetStretchRect(checkmark.GetComponent<RectTransform>(), 5f, 5f, 5f, 5f);
+                var checkmarkImage = checkmark.GetComponent<Image>();
+                checkmarkImage.color = new Color(0.45f, 0.78f, 0.95f, 1f);
+                impossibleFilterToggle = toggleObject.GetComponent<Toggle>();
+                impossibleFilterToggle.targetGraphic = toggleImage;
+                impossibleFilterToggle.graphic = checkmarkImage;
+                impossibleFilterLabel = GetOrCreateText(impossibleFilterRoot.transform, "Label");
+                impossibleFilterLabel.text = "달성불가 조건의 문명·국가도 표시";
+                impossibleFilterLabel.fontSize = 15;
+                impossibleFilterLabel.alignment = TextAnchor.MiddleLeft;
+                SetStretchRect(impossibleFilterLabel.rectTransform, 52f, 0f, 12f, 0f);
+            }
+
+            var usesDescriptionCards = definition.Id == CivicFeatureRegistry.StartCivilizations ||
+                definition.Id == CivicFeatureRegistry.NationFormation ||
+                definition.Id == CivicFeatureRegistry.Politics ||
+                definition.Id == CivicFeatureRegistry.Wonders ||
+                definition.Id == CivicFeatureRegistry.GreatPeople;
+            var rowStride = usesDescriptionCards ? 160f : 72f;
+            var controlsTopOffset = categoryTabRoot != null || impossibleFilterRoot != null ? 150f : 92f;
+            var scroll = CreateScrollArea(root.transform, "DomainScroll", rowCount * rowStride, controlsTopOffset);
             var rows = new CivicModuleActionRow[rowCount];
             var expectedNames = new HashSet<string>(Enumerable.Range(1, rowCount).Select(index => $"DomainActionRow{index:00}"));
             for (var index = scroll.Content.childCount - 1; index >= 0; index--)
@@ -869,15 +1095,20 @@ namespace Civic.Editor.UI
             for (var index = 0; index < rowCount; index++)
             {
                 var row = GetOrCreateChild(scroll.Content, $"DomainActionRow{index + 1:00}", typeof(RectTransform), typeof(Image));
-                SetTopStretchRect(row.GetComponent<RectTransform>(), 0f, index * 72f, 0f, 64f);
+                SetTopStretchRect(row.GetComponent<RectTransform>(), 0f, index * rowStride, 0f, usesDescriptionCards ? 152f : 64f);
                 row.GetComponent<Image>().color = new Color(0.035f, 0.055f, 0.08f, 1f);
                 var info = GetOrCreateText(row.transform, "InfoLabel");
                 info.text = definition.DisplayName + " 항목";
                 info.fontSize = 16;
                 info.alignment = TextAnchor.MiddleLeft;
-                SetStretchRect(info.rectTransform, 14f, 6f, 200f, 6f);
+                SetStretchRect(info.rectTransform, 14f, 6f, 200f, usesDescriptionCards ? 94f : 6f);
                 var action = GetOrCreateButton(row.transform, "ActionButton");
-                SetRect(action.GetComponent<RectTransform>(), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-92f, 0f), new Vector2(160f, 48f));
+                SetRect(
+                    action.GetComponent<RectTransform>(),
+                    usesDescriptionCards ? new Vector2(1f, 1f) : new Vector2(1f, 0.5f),
+                    usesDescriptionCards ? new Vector2(1f, 1f) : new Vector2(1f, 0.5f),
+                    usesDescriptionCards ? new Vector2(-92f, -29f) : new Vector2(-92f, 0f),
+                    new Vector2(160f, 48f));
                 action.GetComponent<Image>().color = new Color(0.20f, 0.36f, 0.58f, 1f);
                 var actionLabel = GetOrCreateText(action.transform, "Label");
                 actionLabel.text = "실행";
@@ -886,9 +1117,22 @@ namespace Civic.Editor.UI
                 SetRect(actionLabel.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
                 var tooltip = GetOrAdd<CivicTooltipTrigger>(action.gameObject);
                 tooltip.AssignTooltipView(tooltipView);
+                var descriptionRoot = GetOrCreateChild(row.transform, "Description", typeof(RectTransform), typeof(Image));
+                SetStretchRect(descriptionRoot.GetComponent<RectTransform>(), 0f, 64f, 0f, 0f);
+                descriptionRoot.GetComponent<Image>().color = new Color(0.075f, 0.105f, 0.145f, 1f);
+                var descriptionLabel = GetOrCreateText(descriptionRoot.transform, "Label");
+                descriptionLabel.text = definition.DisplayName + " 설명과 효과";
+                descriptionLabel.fontSize = 14;
+                descriptionLabel.alignment = TextAnchor.UpperLeft;
+                descriptionLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
+                descriptionLabel.verticalOverflow = VerticalWrapMode.Truncate;
+                SetStretchRect(descriptionLabel.rectTransform, 12f, 7f, 12f, 7f);
+                descriptionRoot.SetActive(usesDescriptionCards);
                 var component = GetOrAdd<CivicModuleActionRow>(row);
                 var serializedRow = new SerializedObject(component);
                 serializedRow.FindProperty("infoLabel").objectReferenceValue = info;
+                serializedRow.FindProperty("descriptionRoot").objectReferenceValue = descriptionRoot;
+                serializedRow.FindProperty("descriptionLabel").objectReferenceValue = descriptionLabel;
                 serializedRow.FindProperty("actionButton").objectReferenceValue = action;
                 serializedRow.FindProperty("actionLabel").objectReferenceValue = actionLabel;
                 serializedRow.FindProperty("tooltip").objectReferenceValue = tooltip;
@@ -903,6 +1147,13 @@ namespace Civic.Editor.UI
             serialized.FindProperty("titleLabel").objectReferenceValue = title;
             serialized.FindProperty("statusLabel").objectReferenceValue = status;
             AssignObjectArray(serialized, "rows", rows);
+            serialized.FindProperty("categoryTabRoot").objectReferenceValue = categoryTabRoot;
+            AssignObjectArray(serialized, "categoryTabRows", categoryTabRows);
+            AssignObjectArray(serialized, "categoryTabButtons", categoryTabButtons);
+            AssignObjectArray(serialized, "categoryTabLabels", categoryTabLabels);
+            serialized.FindProperty("impossibleFilterRoot").objectReferenceValue = impossibleFilterRoot;
+            serialized.FindProperty("impossibleFilterToggle").objectReferenceValue = impossibleFilterToggle;
+            serialized.FindProperty("impossibleFilterLabel").objectReferenceValue = impossibleFilterLabel;
             serialized.ApplyModifiedPropertiesWithoutUndo();
             root.SetActive(domainIndex == 0);
             return view;

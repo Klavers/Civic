@@ -7,6 +7,8 @@ namespace Civic.UI
     public sealed class CivicModuleActionRow : MonoBehaviour
     {
         [SerializeField] private Text infoLabel;
+        [SerializeField] private GameObject descriptionRoot;
+        [SerializeField] private Text descriptionLabel;
         [SerializeField] private Button actionButton;
         [SerializeField] private Text actionLabel;
         [SerializeField] private CivicTooltipTrigger tooltip;
@@ -14,15 +16,21 @@ namespace Civic.UI
         private string key;
         private Action<string> requested;
 
-        public bool HasRequiredReferences => infoLabel != null && actionButton != null && actionLabel != null && tooltip != null;
+        public bool HasRequiredReferences =>
+            infoLabel != null && descriptionRoot != null && descriptionLabel != null &&
+            actionButton != null && actionLabel != null && tooltip != null;
         public Text InfoLabel => infoLabel;
+        public GameObject DescriptionRoot => descriptionRoot;
+        public Text DescriptionLabel => descriptionLabel;
         public Button ActionButton => actionButton;
 
-        public void Bind(string rowKey, string info, string actionText, bool interactable, string tooltipText, Action<string> onRequested)
+        public void Bind(string rowKey, string info, string description, string actionText, bool interactable, string tooltipText, Action<string> onRequested)
         {
             key = rowKey ?? string.Empty;
             requested = onRequested;
             infoLabel.text = info ?? string.Empty;
+            descriptionLabel.text = description ?? string.Empty;
+            descriptionRoot.SetActive(!string.IsNullOrWhiteSpace(description));
             actionLabel.text = string.IsNullOrEmpty(actionText) ? "—" : actionText;
             actionButton.interactable = interactable;
             actionButton.onClick.RemoveListener(HandleRequested);

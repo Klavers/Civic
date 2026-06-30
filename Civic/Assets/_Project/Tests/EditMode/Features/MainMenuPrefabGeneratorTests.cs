@@ -41,6 +41,9 @@ namespace Civic.UI.Tests
             Assert.That(controller.FeatureRows.Count, Is.EqualTo(CivicFeatureRegistry.Features.Count));
             Assert.That(controller.FeatureRows.All(row => row.HasRequiredReferences), Is.True);
             Assert.That(controller.CivilizationSection, Is.Not.Null);
+            Assert.That(controller.OpenOptionsPanelButton, Is.Not.Null);
+            Assert.That(controller.OptionsPanel, Is.Not.Null);
+            Assert.That(controller.DeleteSaveDataButton, Is.Not.Null);
             Assert.That(variant.GetComponentInChildren<ScrollRect>(true), Is.Not.Null);
         }
 

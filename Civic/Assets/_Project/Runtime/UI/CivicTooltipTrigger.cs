@@ -52,5 +52,11 @@ namespace Civic.UI
             isPointerInside = false;
             tooltipView?.Hide();
         }
+
+        private void OnDisable()
+        {
+            isPointerInside = false;
+            tooltipView?.Hide();
+        }
     }
 }

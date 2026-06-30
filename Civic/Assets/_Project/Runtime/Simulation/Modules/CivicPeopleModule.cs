@@ -36,7 +36,7 @@ namespace Civic.Simulation.Modules
     public sealed class CivicPeopleModule : CivicGameplayModuleBase
     {
         private const int CandidateLimit = 3;
-        private const int ActiveSlotLimit = 3;
+        public const int ActiveSlotLimit = 3;
         private const double CandidateLifetime = 120d;
         private const double RetiredLegacyRatio = 0.10d;
 
@@ -56,6 +56,7 @@ namespace Civic.Simulation.Modules
         }
 
         public override string FeatureId => CivicFeatureRegistry.GreatPeople;
+        public IReadOnlyList<CivicPersonDefinition> Definitions => content.People;
         public IReadOnlyList<CivicPersonCandidateSnapshot> Candidates => candidateRemaining
             .Select(pair => new CivicPersonCandidateSnapshot(Person(pair.Key), pair.Value)).ToArray();
         public IReadOnlyList<CivicActivePersonSnapshot> ActivePeople => tenureRemaining
@@ -68,6 +69,41 @@ namespace Civic.Simulation.Modules
         public IReadOnlyCollection<string> RetiredIds => retiredIds;
         public IReadOnlyList<object> InactiveEffects => inactiveEffects;
         public int ProvisionalEffectCount => content.Traits.Count(item => item.EffectType == CivicProvisionalEffect.Planned) + content.Abilities.Count(item => item.EffectType == CivicProvisionalEffect.Planned);
+
+        public IReadOnlyList<CivicPersonConditionDefinition> ConditionsFor(string personId) => content.Conditions.Where(item => item.PersonId == personId).ToArray();
+        public IReadOnlyList<CivicPersonEffectDefinition> TraitsFor(string personId) => content.Traits.Where(item => item.PersonId == personId).ToArray();
+        public IReadOnlyList<CivicPersonAbilityDefinition> AbilitiesFor(string personId) => content.Abilities.Where(item => item.PersonId == personId).ToArray();
+        public IReadOnlyList<CivicMetricConditionSnapshot> ConditionStatusFor(string personId) => ConditionsFor(personId)
+            .Select(condition =>
+            {
+                var current = Context.Telemetry.GetMetric(condition.MetricId, Context.MetaProgress);
+                return new CivicMetricConditionSnapshot(
+                    condition.MetricId,
+                    condition.Comparator,
+                    condition.Value,
+                    current,
+                    CivicConditionEvaluator.Compare(current, condition.Comparator, condition.Value));
+            }).ToArray();
+
+        public double AssignmentScaleFor(string personId)
+        {
+            if (!assignments.TryGetValue(personId, out var assignment)) return 1d;
+            var order = assignments.Where(pair => pair.Value == assignment).OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Key).ToList().IndexOf(personId) + 1;
+            return order <= 1 ? 1d : order == 2 ? 0.70d : 0.50d;
+        }
+
+        public bool DebugOfferCandidate(string personId)
+        {
+            if (content.People.All(item => item.Id != personId) || tenureRemaining.ContainsKey(personId)) return false;
+            if (candidateRemaining.Count >= CandidateLimit && !candidateRemaining.ContainsKey(personId))
+            {
+                var oldest = candidateRemaining.Keys.OrderBy(id => id, StringComparer.Ordinal).First();
+                candidateRemaining.Remove(oldest);
+            }
+            appearedIds.Add(personId);
+            candidateRemaining[personId] = CandidateLifetime;
+            return true;
+        }
 
         public override void Initialize(CivicModuleContext context)
         {

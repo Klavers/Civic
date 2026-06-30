@@ -20,7 +20,8 @@ namespace Civic.Simulation.Modules
             CivicWonderContent wonderContent = null,
             CivicPeopleContent peopleContent = null,
             CivicEventContent eventContent = null,
-            CivicModuleBalanceContent balanceContent = null)
+            CivicModuleBalanceContent balanceContent = null,
+            IReadOnlyList<CivicAchievementRewardDefinition> achievementRewards = null)
         {
             Simulation = simulation ?? throw new ArgumentNullException(nameof(simulation));
             Features = features ?? throw new ArgumentNullException(nameof(features));
@@ -88,7 +89,8 @@ namespace Civic.Simulation.Modules
             if (features.IsEnabled(CivicFeatureRegistry.Achievements))
             {
                 var achievements = content?.Achievements ?? CivicModuleContentLoader.LoadAchievementsFromResources();
-                modules.Add(CivicFeatureRegistry.Achievements, new CivicAchievementModule(achievements));
+                achievementRewards = achievementRewards ?? CivicAchievementRewardContentLoader.LoadFromResources(achievements);
+                modules.Add(CivicFeatureRegistry.Achievements, new CivicAchievementModule(achievements, achievementRewards));
             }
 
             context = new CivicModuleContext(simulation, features, MetaProgress, Telemetry, modules);

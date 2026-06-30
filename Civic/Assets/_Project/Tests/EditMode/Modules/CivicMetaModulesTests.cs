@@ -59,6 +59,30 @@ namespace Civic.Simulation.Modules.Tests
         }
 
         [Test]
+        public void JsonMetaProgressStore_DeleteRemovesPrimaryBackupAndTemporaryFiles()
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "CivicMetaTests", System.Guid.NewGuid().ToString("N"));
+            var path = Path.Combine(directory, "meta.json");
+            try
+            {
+                var store = new CivicJsonMetaProgressStore(path);
+                store.Save(new CivicMetaProgress { PrestigePoints = 1 });
+                store.Save(new CivicMetaProgress { PrestigePoints = 2 });
+                File.WriteAllText(path + ".tmp", "temporary");
+                store.Delete();
+
+                Assert.That(File.Exists(path), Is.False);
+                Assert.That(File.Exists(path + ".bak"), Is.False);
+                Assert.That(File.Exists(path + ".tmp"), Is.False);
+                Assert.That(store.Load().PrestigePoints, Is.Zero);
+            }
+            finally
+            {
+                if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            }
+        }
+
+        [Test]
         public void CivilizationContent_LoadsDefaultAndFifteenProposedCivilizations()
         {
             var content = CivicCivilizationContentLoader.LoadFromResources();
@@ -188,6 +212,7 @@ namespace Civic.Simulation.Modules.Tests
             Assert.That(module.CompletedThisRun, Contains.Item("thriving_settlement"));
             Assert.That(runtime.MetaProgress.CompletedAchievementIds.Count(id => id == "thriving_settlement"), Is.EqualTo(1));
             Assert.That(module.PrestigeRewardEarnedThisRun, Is.EqualTo(3));
+            Assert.That(simulation.Modifiers.Entries.Any(item => item.SourceType == "achievement" && item.SourceId == "thriving_settlement" && item.EffectType == CivicModifierEffectTypes.PopulationBaseAdd), Is.True);
         }
 
         [Test]
@@ -286,6 +311,28 @@ namespace Civic.Simulation.Modules.Tests
         }
 
         [Test]
+        public void NationModule_MarksMismatchedStartingCivilizationAsImpossibleThisRun()
+        {
+            CivicRunLaunchSettings.StartingCivilizationId = "arpadel";
+            const string nations = "id,displayNameKo,conceptId,tier,preparationSeconds,treasuryCost,secret,requiredFeatureIds,descriptionKo\n" +
+                "other_origin,타 문명 계승국,test,1,1,0,false,,다른 시작 문명 전용 국가\n";
+            const string conditions = "nationId,metricId,comparator,value,alternativeGroup\n" +
+                "other_origin,identity.startingCivilization.thalassa,==,1,\n";
+            const string effects = "nationId,charterId,effectType,targetId,amount,capGroup\n";
+            var content = CivicNationContentLoader.Parse(nations, conditions, effects);
+            var simulation = new CivicGameSimulation(gameData);
+            var runtime = new CivicModuleRuntime(
+                simulation,
+                CivicFeatureResolver.Resolve(new[] { CivicFeatureRegistry.StartCivilizations, CivicFeatureRegistry.NationFormation }),
+                nationContent: content);
+            var module = runtime.GetModule<CivicNationModule>(CivicFeatureRegistry.NationFormation);
+
+            Assert.That(module.IsImpossibleThisRun("other_origin"), Is.True);
+            Assert.That(module.ImpossibleReasonFor("other_origin"), Does.Contain("identity.startingCivilization.thalassa"));
+            Assert.That(module.Snapshot.Single().BlockingReason, Does.Contain("이번 런 달성 불가"));
+        }
+
+        [Test]
         public void PoliticsModule_CompletesOneReformAndReplacesCategoryModifier()
         {
             const string institutions = "id,category,displayNameKo,descriptionKo,order,isDefault,politicalCost,treasuryCost,reformSeconds,fatigueSeconds\n" +
@@ -358,6 +405,9 @@ namespace Civic.Simulation.Modules.Tests
             Assert.That(module.TryChoose("test_event", "test_choice"), Is.True);
             Assert.That(simulation.State.Resources["wheat"], Is.EqualTo(before + CivicNumber.FromDouble(2d)));
             Assert.That(runtime.MetaProgress.DiscoveredEventIds, Contains.Item("test_event"));
+            Assert.That(module.History.Single().EventTitleKo, Is.EqualTo("test"));
+            Assert.That(module.History.Single().ChoiceTextKo, Is.EqualTo("choose"));
+            Assert.That(module.History.Single().AppliedResults, Has.Some.Contains("wheat"));
         }
 
         [Test]
