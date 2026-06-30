@@ -8,7 +8,7 @@ namespace Civic.Simulation.Modules
 {
     public sealed class CivicLegacyPerkDefinition
     {
-        public CivicLegacyPerkDefinition(string id, string category, string displayNameKo, int maxRank, string effectType, string targetId, double amount)
+        public CivicLegacyPerkDefinition(string id, string category, string displayNameKo, int maxRank, string effectType, string targetId, double amount, IReadOnlyList<int> rankCosts)
         {
             Id = id;
             Category = category;
@@ -17,6 +17,7 @@ namespace Civic.Simulation.Modules
             EffectType = effectType;
             TargetId = targetId;
             Amount = amount;
+            RankCosts = rankCosts ?? Array.Empty<int>();
         }
 
         public string Id { get; }
@@ -26,6 +27,8 @@ namespace Civic.Simulation.Modules
         public string EffectType { get; }
         public string TargetId { get; }
         public double Amount { get; }
+        public IReadOnlyList<int> RankCosts { get; }
+        public int CostForNextRank(int currentRank) => currentRank < 0 || currentRank >= RankCosts.Count ? -1 : RankCosts[currentRank];
     }
 
     public sealed class CivicAchievementDefinition
@@ -169,7 +172,8 @@ namespace Civic.Simulation.Modules
                     Integer(row, "maxRank", errors, "legacy_perks.csv"),
                     Value(row, "effectType"),
                     Value(row, "targetId"),
-                    Number(row, "amount", errors, "legacy_perks.csv")))
+                    Number(row, "amount", errors, "legacy_perks.csv"),
+                    IntegerList(row, "rankCosts", errors, "legacy_perks.csv")))
                 .ToArray();
         }
 
@@ -221,6 +225,10 @@ namespace Civic.Simulation.Modules
                 if (string.IsNullOrWhiteSpace(perk.Id) || string.IsNullOrWhiteSpace(perk.EffectType) || perk.MaxRank <= 0)
                 {
                     errors.Add($"Invalid legacy perk definition: {perk.Id}");
+                }
+                if (perk.RankCosts.Count != perk.MaxRank || perk.RankCosts.Any(cost => cost <= 0) || perk.RankCosts.Zip(perk.RankCosts.Skip(1), (left, right) => right >= left).Any(valid => !valid))
+                {
+                    errors.Add($"Legacy perk rank costs must match maxRank and increase monotonically: {perk.Id}");
                 }
             }
 
@@ -293,6 +301,17 @@ namespace Civic.Simulation.Modules
 
             errors.Add($"{source} has invalid boolean {key}: {raw}");
             return false;
+        }
+
+        private static IReadOnlyList<int> IntegerList(IReadOnlyDictionary<string, string> row, string key, ICollection<string> errors, string source)
+        {
+            var result = new List<int>();
+            foreach (var raw in SplitIds(Value(row, key)))
+            {
+                if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)) result.Add(value);
+                else errors.Add($"{source} has invalid integer in {key}: {raw}");
+            }
+            return result;
         }
 
         private static IReadOnlyList<string> SplitIds(string value)

@@ -56,6 +56,7 @@ namespace Civic.Simulation.Modules
         public CivicCivilizationDefinition ActiveCivilization { get; private set; }
         public IReadOnlyList<CivicCivilizationDefinition> Definitions => content.Civilizations;
         public IReadOnlyList<CivicCivilizationEffectDefinition> InactiveEffects => inactiveEffects;
+        public int ProvisionalEffectCount => ActiveCivilization == null ? 0 : content.Effects.Count(item => item.CivilizationId == ActiveCivilization.Id && item.EffectType == CivicProvisionalEffect.Planned);
 
         public override void Initialize(CivicModuleContext context)
         {
@@ -78,7 +79,8 @@ namespace Civic.Simulation.Modules
         {
             foreach (var effect in content.Effects.Where(item => item.CivilizationId == ActiveCivilization.Id))
             {
-                if (!DirectModifierEffects.Contains(effect.EffectType))
+                var resolved = effect.Resolve();
+                if (!resolved.IsProvisional && !DirectModifierEffects.Contains(resolved.EffectType))
                 {
                     inactiveEffects.Add(effect);
                     continue;
@@ -87,10 +89,10 @@ namespace Civic.Simulation.Modules
                 Context.Modifiers.Add(new CivicModifierEntry(
                     "civilization",
                     ActiveCivilization.Id,
-                    effect.EffectType,
-                    effect.TargetId,
-                    effect.Amount,
-                    effect.CapGroup));
+                    resolved.EffectType,
+                    resolved.TargetId,
+                    resolved.Amount,
+                    resolved.CapGroup));
             }
         }
 

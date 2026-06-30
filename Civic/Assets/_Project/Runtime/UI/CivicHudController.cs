@@ -97,13 +97,18 @@ namespace Civic.UI
             if (moduleRuntime == null) return;
             if (featureId == CivicFeatureRegistry.Prestige)
             {
-                if (!prestigeConfirmationPending)
+                var module = moduleRuntime.GetModule<CivicPrestigeModule>(featureId);
+                if (key != "__prestige")
+                {
+                    module?.TryPurchaseLegacyPerk(key, out _, out _);
+                    prestigeConfirmationPending = false;
+                }
+                else if (!prestigeConfirmationPending)
                 {
                     prestigeConfirmationPending = true;
                 }
                 else
                 {
-                    var module = moduleRuntime.GetModule<CivicPrestigeModule>(featureId);
                     if (module != null && module.TryPrestige(out _))
                     {
                         CivicFeatureRuntime.ResetForMainMenu();
@@ -143,6 +148,17 @@ namespace Civic.UI
                 var module = moduleRuntime.GetModule<CivicPeopleModule>(featureId);
                 if (key.StartsWith("recruit:", StringComparison.Ordinal)) module?.TryRecruit(key.Substring("recruit:".Length));
                 else if (key.StartsWith("ability:", StringComparison.Ordinal)) module?.TryUseAbility(key.Substring("ability:".Length));
+                else if (key.StartsWith("assign:", StringComparison.Ordinal) && module != null)
+                {
+                    var personId = key.Substring("assign:".Length);
+                    var active = module.ActivePeople.FirstOrDefault(item => item.Definition.Id == personId);
+                    if (active != null)
+                    {
+                        var assignments = active.Definition.AllowedAssignments;
+                        var currentIndex = assignments.ToList().IndexOf(active.AssignmentId);
+                        module.TryAssign(personId, assignments[(currentIndex + 1 + assignments.Count) % assignments.Count]);
+                    }
+                }
             }
 
             Render();

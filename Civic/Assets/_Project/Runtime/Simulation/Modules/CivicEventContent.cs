@@ -82,7 +82,7 @@ namespace Civic.Simulation.Modules
 
     public sealed class CivicEventEffectDefinition
     {
-        public CivicEventEffectDefinition(string choiceId, string effectType, string targetId, double amount, double duration, string stackGroup)
+        public CivicEventEffectDefinition(string choiceId, string effectType, string targetId, double amount, double duration, string stackGroup, string capGroup = "", string runtimeEffectType = "", string runtimeTargetId = "")
         {
             ChoiceId = choiceId;
             EffectType = effectType;
@@ -90,6 +90,9 @@ namespace Civic.Simulation.Modules
             Amount = amount;
             Duration = duration;
             StackGroup = stackGroup;
+            CapGroup = capGroup;
+            RuntimeEffectType = runtimeEffectType;
+            RuntimeTargetId = runtimeTargetId;
         }
 
         public string ChoiceId { get; }
@@ -98,6 +101,10 @@ namespace Civic.Simulation.Modules
         public double Amount { get; }
         public double Duration { get; }
         public string StackGroup { get; }
+        public string CapGroup { get; }
+        public string RuntimeEffectType { get; }
+        public string RuntimeTargetId { get; }
+        public CivicResolvedModuleEffect Resolve() => CivicProvisionalEffect.Resolve(EffectType, TargetId, RuntimeEffectType, RuntimeTargetId, Amount, Duration, CapGroup);
     }
 
     public sealed class CivicEventContent
@@ -149,7 +156,8 @@ namespace Civic.Simulation.Modules
                 Number(row, "requirementValue", errors, "event_choices.csv"), Value(row, "nextEventId"))).ToArray();
             var effects = CivicCsvParser.Parse(effectsCsv, errors, "event_effects.csv").Select(row => new CivicEventEffectDefinition(
                 Value(row, "choiceId"), Value(row, "effectType"), Value(row, "targetId"), Number(row, "amount", errors, "event_effects.csv"),
-                Number(row, "duration", errors, "event_effects.csv"), Value(row, "stackGroup"))).ToArray();
+                Number(row, "duration", errors, "event_effects.csv"), Value(row, "stackGroup"), Value(row, "capGroup"),
+                Value(row, "runtimeEffectType"), Value(row, "runtimeTargetId"))).ToArray();
             Validate(events, conditions, choices, effects, errors);
             if (errors.Count > 0) throw new CivicDataException(errors.ToArray());
             return new CivicEventContent(events, conditions, choices, effects);

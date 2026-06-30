@@ -54,6 +54,7 @@ namespace Civic.Simulation.Modules
         public IReadOnlyCollection<string> CompletedIds => completedIds;
         public IReadOnlyList<CivicWonderSnapshot> Snapshot => snapshot;
         public IReadOnlyList<CivicWonderEffectDefinition> InactiveEffects => inactiveEffects;
+        public int ProvisionalEffectCount => content.Effects.Count(item => item.EffectType == CivicProvisionalEffect.Planned);
 
         public override void Initialize(CivicModuleContext context)
         {
@@ -87,8 +88,10 @@ namespace Civic.Simulation.Modules
             var wonder = content.Wonders.FirstOrDefault(item => item.Id == wonderId);
             if (wonder == null || !IsUnlocked(wonder, out _)) return false;
             var treasury = Context.Simulation.State.Resources["treasury"].ToDouble();
-            if (treasury + 1e-9d < wonder.UpfrontTreasury) return false;
-            Context.Simulation.State.Resources["treasury"] = CivicNumber.FromDouble(treasury - wonder.UpfrontTreasury);
+            var costMultiplier = Context.Modifiers.Multiplier(CivicModifierEffectTypes.WonderCostMultiplier, wonderId, wonder.ConceptId, "*");
+            var upfrontTreasury = wonder.UpfrontTreasury * costMultiplier;
+            if (treasury + 1e-9d < upfrontTreasury) return false;
+            Context.Simulation.State.Resources["treasury"] = CivicNumber.FromDouble(treasury - upfrontTreasury);
             activeProjectId = wonderId;
             activeProgressBonus = 0d;
             foreach (var cost in Costs(wonderId)) delivered[Key(wonderId, cost.ResourceId)] = 0d;
@@ -133,9 +136,11 @@ namespace Civic.Simulation.Modules
             foreach (var cost in Costs(wonderId))
             {
                 var current = Delivered(wonderId, cost.ResourceId);
-                var remaining = Math.Max(0d, cost.Amount - current);
+                var effectiveCost = EffectiveCostAmount(cost, wonderId);
+                var remaining = Math.Max(0d, effectiveCost - current);
                 if (remaining <= 0d) continue;
-                var requested = Math.Min(remaining, cost.DeliveryRate * seconds);
+                var progressMultiplier = Context.Modifiers.Multiplier(CivicModifierEffectTypes.WonderProgressMultiplier, wonderId, "*");
+                var requested = Math.Min(remaining, cost.DeliveryRate * progressMultiplier * seconds);
                 var consumed = ConsumeResource(cost.ResourceId, requested);
                 delivered[Key(wonderId, cost.ResourceId)] = current + consumed;
             }
@@ -195,16 +200,11 @@ namespace Civic.Simulation.Modules
             activeProgressBonus = 0d;
             foreach (var effect in content.Effects.Where(item => item.WonderId == wonderId))
             {
-                if (effect.EffectType == "planned")
-                {
-                    inactiveEffects.Add(effect);
-                    continue;
-                }
-
-                var sourceType = effect.Duration > 0d ? "wonderTimed" : "wonder";
-                var sourceId = effect.Duration > 0d ? wonderId + ":" + effect.EffectType + ":" + effect.TargetId : wonderId;
-                Context.Modifiers.Add(new CivicModifierEntry(sourceType, sourceId, effect.EffectType, effect.TargetId, effect.Amount, effect.CapGroup));
-                if (effect.Duration > 0d) timedEffectRemaining[sourceId] = effect.Duration;
+                var resolved = effect.Resolve();
+                var sourceType = resolved.Duration > 0d ? "wonderTimed" : "wonder";
+                var sourceId = resolved.Duration > 0d ? wonderId + ":" + resolved.EffectType + ":" + resolved.TargetId : wonderId;
+                Context.Modifiers.Add(new CivicModifierEntry(sourceType, sourceId, resolved.EffectType, resolved.TargetId, resolved.Amount, resolved.CapGroup));
+                if (resolved.Duration > 0d) timedEffectRemaining[sourceId] = resolved.Duration;
             }
 
             if (!Context.MetaProgress.CompletedWonderIds.Contains(wonderId)) Context.MetaProgress.CompletedWonderIds.Add(wonderId);
@@ -268,7 +268,13 @@ namespace Civic.Simulation.Modules
 
         private double CalculateProgress(string wonderId)
         {
-            return Math.Min(1d, Costs(wonderId).Select(cost => Delivered(wonderId, cost.ResourceId) / cost.Amount).DefaultIfEmpty(0d).Min() + (wonderId == activeProjectId ? activeProgressBonus : 0d));
+            return Math.Min(1d, Costs(wonderId).Select(cost => Delivered(wonderId, cost.ResourceId) / EffectiveCostAmount(cost, wonderId)).DefaultIfEmpty(0d).Min() + (wonderId == activeProjectId ? activeProgressBonus : 0d));
+        }
+
+        private double EffectiveCostAmount(CivicWonderCostDefinition cost, string wonderId)
+        {
+            var wonder = content.Wonders.First(item => item.Id == wonderId);
+            return Math.Max(1e-9d, cost.Amount * Context.Modifiers.Multiplier(CivicModifierEffectTypes.WonderCostMultiplier, wonderId, wonder.ConceptId, "*"));
         }
 
         private IEnumerable<CivicWonderCostDefinition> Costs(string wonderId) => content.Costs.Where(item => item.WonderId == wonderId);

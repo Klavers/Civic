@@ -25,9 +25,6 @@ namespace Civic.Simulation.Modules
 
     public sealed class CivicPoliticsModule : CivicGameplayModuleBase
     {
-        private const double NeutralLegitimacy = 50d;
-        private const double NeutralSupport = 0.50d;
-        private const double BasePoliticalCapitalPerSecond = 1d;
         private readonly CivicPoliticsContent content;
         private readonly Dictionary<string, string> activeByCategory = new Dictionary<string, string>(StringComparer.Ordinal);
         private readonly Dictionary<string, int> reformCountByCategory = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -44,7 +41,10 @@ namespace Civic.Simulation.Modules
         public IReadOnlyDictionary<string, string> ActiveByCategory => activeByCategory;
         public IReadOnlyList<CivicInstitutionDefinition> Definitions => content.Institutions;
         public IReadOnlyList<CivicInstitutionEffectDefinition> InactiveEffects => inactiveEffects;
-        public double Legitimacy { get; private set; } = NeutralLegitimacy;
+        public int ProvisionalEffectCount => activeByCategory.Values.SelectMany(id => content.Effects.Where(item => item.InstitutionId == id && item.EffectType == CivicProvisionalEffect.Planned)).Count();
+        public double Legitimacy { get; private set; }
+        public double LivingStandard { get; private set; }
+        public double Support { get; private set; }
         public double PoliticalCapital { get; private set; }
         public double FatigueRemaining { get; private set; }
         public CivicReformSnapshot Reform { get; private set; }
@@ -52,6 +52,9 @@ namespace Civic.Simulation.Modules
         public override void Initialize(CivicModuleContext context)
         {
             base.Initialize(context);
+            Legitimacy = content.Rules["neutralLegitimacy"];
+            LivingStandard = CalculateLivingStandard();
+            Support = CalculateSupport();
             foreach (var group in content.Institutions.GroupBy(item => item.Category, StringComparer.Ordinal))
             {
                 activeByCategory[group.Key] = group.Single(item => item.IsDefault).Id;
@@ -65,7 +68,10 @@ namespace Civic.Simulation.Modules
         {
             var elapsed = Math.Max(0d, seconds);
             FatigueRemaining = Math.Max(0d, FatigueRemaining - elapsed);
-            PoliticalCapital += elapsed * BasePoliticalCapitalPerSecond * PoliticalCapitalMultiplier();
+            LivingStandard = CalculateLivingStandard();
+            Support = CalculateSupport();
+            var legitimacyFactor = content.Rules["politicalCapitalLegitimacyBase"] + Legitimacy * content.Rules["politicalCapitalLegitimacyWeight"];
+            PoliticalCapital += elapsed * content.Rules["basePoliticalCapitalPerSecond"] * Math.Max(0d, legitimacyFactor) * PoliticalCapitalMultiplier();
             ApplyInstitutionUpkeep(elapsed);
             RecalculateLegitimacy();
             if (!string.IsNullOrEmpty(targetInstitutionId)) AdvanceReform(elapsed);
@@ -91,12 +97,15 @@ namespace Civic.Simulation.Modules
             if (!string.IsNullOrEmpty(targetInstitutionId) || FatigueRemaining > 0d || !IsUnlocked(institutionId)) return false;
             var institution = content.Institutions.First(item => item.Id == institutionId);
             if (activeByCategory.TryGetValue(institution.Category, out var current) && current == institutionId) return false;
-            if (PoliticalCapital + 1e-9d < institution.PoliticalCost || Context.Simulation.State.Resources["treasury"].ToDouble() + 1e-9d < institution.TreasuryCost) return false;
-            PoliticalCapital -= institution.PoliticalCost;
-            Context.Simulation.State.Resources["treasury"] -= CivicNumber.FromDouble(institution.TreasuryCost);
+            var costMultiplier = Context.Modifiers.Multiplier(CivicModifierEffectTypes.ReformCostMultiplier, institution.Id, institution.Category, "*");
+            var politicalCost = institution.PoliticalCost * costMultiplier;
+            var treasuryCost = institution.TreasuryCost * costMultiplier;
+            if (PoliticalCapital + 1e-9d < politicalCost || Context.Simulation.State.Resources["treasury"].ToDouble() + 1e-9d < treasuryCost) return false;
+            PoliticalCapital -= politicalCost;
+            Context.Simulation.State.Resources["treasury"] -= CivicNumber.FromDouble(treasuryCost);
             targetInstitutionId = institutionId;
             reformProgress = 0d;
-            Reform = new CivicReformSnapshot(institutionId, 0d, NeutralSupport, Resistance(), false);
+            Reform = new CivicReformSnapshot(institutionId, 0d, Support, Resistance(), false);
             return true;
         }
 
@@ -125,7 +134,7 @@ namespace Civic.Simulation.Modules
             PublishThreshold(previous, reformProgress, 50d);
             PublishThreshold(previous, reformProgress, 75d);
             if (reformProgress >= 100d - 1e-9d) CompleteReform(institution);
-            else Reform = new CivicReformSnapshot(targetInstitutionId, reformProgress, NeutralSupport, Resistance(), false);
+            else Reform = new CivicReformSnapshot(targetInstitutionId, reformProgress, Support, Resistance(), false);
             PublishMetrics();
             return true;
         }
@@ -150,7 +159,7 @@ namespace Civic.Simulation.Modules
                 }
             }
 
-            Reform = new CivicReformSnapshot(targetInstitutionId, reformProgress, NeutralSupport, resistance, paused);
+            Reform = new CivicReformSnapshot(targetInstitutionId, reformProgress, Support, resistance, paused);
         }
 
         private void CompleteReform(CivicInstitutionDefinition institution)
@@ -173,12 +182,8 @@ namespace Civic.Simulation.Modules
             {
                 foreach (var effect in content.Effects.Where(item => item.InstitutionId == institutionId && string.IsNullOrEmpty(item.CostType)))
                 {
-                    if (IsPoliticsOnlyEffect(effect.EffectType) || effect.EffectType == "planned")
-                    {
-                        if (effect.EffectType == "planned") inactiveEffects.Add(effect);
-                        continue;
-                    }
-                    Context.Modifiers.Add(new CivicModifierEntry("institution", institutionId, effect.EffectType, effect.TargetId, effect.Amount, effect.CapGroup));
+                    var resolved = effect.Resolve();
+                    Context.Modifiers.Add(new CivicModifierEntry("institution", institutionId, resolved.EffectType, resolved.TargetId, resolved.Amount, resolved.CapGroup));
                 }
             }
         }
@@ -197,15 +202,15 @@ namespace Civic.Simulation.Modules
 
         private void RecalculateLegitimacy()
         {
-            var add = activeByCategory.Values.SelectMany(id => content.Effects.Where(item => item.InstitutionId == id && item.EffectType == "legitimacyAdd")).Sum(item => item.Amount);
             var floor = activeByCategory.Values.SelectMany(id => content.Effects.Where(item => item.InstitutionId == id && item.EffectType == "legitimacyFloor")).Select(item => item.Amount).DefaultIfEmpty(0d).Max();
-            Legitimacy = Math.Max(floor, Math.Min(100d, NeutralLegitimacy + add));
+            var livingStandardContribution = (LivingStandard - 50d) * content.Rules["legitimacyLivingStandardWeight"];
+            var modifierAdd = Context.Modifiers.Additive(CivicModifierEffectTypes.LegitimacyAdd, "*");
+            Legitimacy = Math.Max(floor, Math.Min(100d, content.Rules["neutralLegitimacy"] + modifierAdd + livingStandardContribution));
         }
 
-        private double PoliticalCapitalMultiplier() => Math.Max(0d, 1d + activeByCategory.Values.SelectMany(id => content.Effects.Where(item => item.InstitutionId == id && item.EffectType == "politicalCapitalMultiplier")).Sum(item => item.Amount));
-        private double ReformSpeedMultiplier() => Math.Max(0d, 1d + activeByCategory.Values.SelectMany(id => content.Effects.Where(item => item.InstitutionId == id && item.EffectType == "reformSpeedMultiplier")).Sum(item => item.Amount));
-        private double Resistance() => Math.Max(0d, Math.Min(100d, 50d - NeutralSupport * 50d + activeByCategory.Values.SelectMany(id => content.Effects.Where(item => item.InstitutionId == id && item.EffectType == "reformResistanceAdd")).Sum(item => item.Amount)));
-        private static bool IsPoliticsOnlyEffect(string effectType) => effectType == "legitimacyAdd" || effectType == "legitimacyFloor" || effectType == "politicalCapitalMultiplier" || effectType == "reformSpeedMultiplier" || effectType == "reformResistanceAdd";
+        private double PoliticalCapitalMultiplier() => Context.Modifiers.Multiplier(CivicModifierEffectTypes.PoliticalCapitalMultiplier, "*");
+        private double ReformSpeedMultiplier() => Context.Modifiers.Multiplier(CivicModifierEffectTypes.ReformSpeedMultiplier, "*");
+        private double Resistance() => Math.Max(0d, Math.Min(100d, 50d - Support * 50d + Context.Modifiers.Additive(CivicModifierEffectTypes.ReformResistanceAdd, "*")));
 
         private void PublishThreshold(double previous, double current, double threshold)
         {
@@ -223,9 +228,37 @@ namespace Civic.Simulation.Modules
             foreach (var pair in reformCountByCategory) Context.Telemetry.SetExternalMetric("reform.count." + pair.Key, pair.Value);
             Context.Telemetry.SetExternalMetric("politics.legitimacy", Legitimacy);
             Context.Telemetry.SetExternalMetric("politics.capital", PoliticalCapital);
+            Context.Telemetry.SetExternalMetric("snapshot.livingStandard", LivingStandard);
+            Context.Telemetry.SetExternalMetric("politics.support", Support);
             Context.Telemetry.SetExternalMetric("politics.resistance", Resistance());
             Context.Telemetry.SetExternalMetric("reform.active", string.IsNullOrEmpty(targetInstitutionId) ? 0d : 1d);
             Context.Telemetry.SetExternalMetric("reform.progress", reformProgress);
+        }
+
+        private double CalculateLivingStandard()
+        {
+            var snapshot = Context.Simulation.Snapshot;
+            var populationResources = Context.Simulation.Data.Resources
+                .Where(resource => resource.IsPopulationConsumption)
+                .Select(resource => snapshot.Resources.FirstOrDefault(item => item.Id == resource.Id))
+                .Where(resource => resource != null)
+                .ToArray();
+            var averageSupply = populationResources.Select(resource => resource.SupplyRate).DefaultIfEmpty(1d).Average();
+            var population = Math.Max(1d, snapshot.Population.ToDouble());
+            var gdpPerCapita = snapshot.Gdp.ToDouble() / population;
+            var normalizedGdp = Math.Max(0d, Math.Min(1d, Math.Log10(1d + Math.Max(0d, gdpPerCapita)) / 3d));
+            var treasuryHealth = snapshot.Treasury > CivicNumber.Zero ? 1d : 0d;
+            var value = content.Rules["livingStandardBase"]
+                + averageSupply * content.Rules["livingStandardSupplyWeight"]
+                + normalizedGdp * content.Rules["livingStandardGdpPerCapitaWeight"]
+                + treasuryHealth * content.Rules["livingStandardTreasuryWeight"]
+                + Context.Modifiers.Additive(CivicModifierEffectTypes.LivingStandardAdd, "*");
+            return Math.Max(content.Rules["livingStandardMinimum"], Math.Min(content.Rules["livingStandardMaximum"], value));
+        }
+
+        private double CalculateSupport()
+        {
+            return Math.Max(0d, Math.Min(1d, content.Rules["neutralSupport"] + (LivingStandard - 50d) * content.Rules["supportLivingStandardWeight"]));
         }
     }
 }

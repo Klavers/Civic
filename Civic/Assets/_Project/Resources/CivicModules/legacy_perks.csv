@@ -1,16 +1,16 @@
-id,category,displayNameKo,maxRank,effectType,targetId,amount
-pioneer_construction_team,economy,개척 건설단,3,startingResourceAdd,construction_power,5
-standardized_tools,economy,표준화된 공구,5,earlyEraConstructionCostMultiplier,primitive;ancient,-0.03
-stockpiling_practice,economy,비축 관행,5,startingUnlockedResourceAdd,element,2
-settler_tradition,population,개척민 전통,3,startingResourceAdd,population,1
-communal_storehouse,population,공동 저장고,1,timedPopulationConsumptionMultiplier,60,-0.10
-urban_design_memory,population,도시 설계 기억,5,housingSupplyBuffer,food,0.05
-oral_knowledge,research,구전 지식,5,startingResourceAdd,science,3
-era_archives,research,시대 기록보관소,5,previousEraTechnologyCostMultiplier,highestEra,-0.02
-research_methodology,research,연구 방법론,1,firstEraResearchRefund,science,0.10
-administrative_forms,governance,행정 문서 양식,5,reformCostMultiplier,all,-0.05
-founding_myth,governance,건국 신화,1,nationConditionDurationMultiplier,all,-0.10
-tax_practice,governance,조세 관행,3,startingTaxRateAdd,treasury,0.01
-wonder_craftsmen,culture,불가사의 장인단,1,firstWonderCostMultiplier,all,-0.10
-great_person_chronicle,culture,위인 연대기,1,freePersonReroll,all,1
-challenger_seal,culture,도전자 인장,1,challengePrestigeMultiplier,hard,0.20
+"id","category","displayNameKo","maxRank","effectType","targetId","amount","rankCosts"
+"pioneer_construction_team","economy","개척 건설단","3","startingResourceAdd","construction_power","5","5;10;20"
+"standardized_tools","economy","표준화된 공구","5","earlyEraConstructionCostMultiplier","primitive;ancient","-0.03","3;6;12;24;48"
+"stockpiling_practice","economy","비축 관행","5","startingUnlockedResourceAdd","element","2","3;6;12;24;48"
+"settler_tradition","population","개척민 전통","3","startingResourceAdd","population","1","5;10;20"
+"communal_storehouse","population","공동 저장고","1","timedPopulationConsumptionMultiplier","60","-0.10","20"
+"urban_design_memory","population","도시 설계 기억","5","housingSupplyBuffer","food","0.05","3;6;12;24;48"
+"oral_knowledge","research","구전 지식","5","startingResourceAdd","science","3","3;6;12;24;48"
+"era_archives","research","시대 기록보관소","5","previousEraTechnologyCostMultiplier","highestEra","-0.02","3;6;12;24;48"
+"research_methodology","research","연구 방법론","1","firstEraResearchRefund","science","0.10","30"
+"administrative_forms","governance","행정 문서 양식","5","reformCostMultiplier","all","-0.05","3;6;12;24;48"
+"founding_myth","governance","건국 신화","1","nationConditionDurationMultiplier","all","-0.10","30"
+"tax_practice","governance","조세 관행","3","startingTaxRateAdd","treasury","0.01","5;10;20"
+"wonder_craftsmen","culture","불가사의 장인단","1","firstWonderCostMultiplier","all","-0.10","30"
+"great_person_chronicle","culture","위인 연대기","1","freePersonReroll","all","1","20"
+"challenger_seal","culture","도전자 인장","1","challengePrestigeMultiplier","hard","0.20","30"

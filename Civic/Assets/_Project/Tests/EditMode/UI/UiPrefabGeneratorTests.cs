@@ -1,5 +1,6 @@
 using System.Linq;
 using Civic.Editor.UI;
+using Civic.Features;
 using Civic.Simulation;
 using NUnit.Framework;
 using UnityEditor;
@@ -42,7 +43,9 @@ namespace Civic.UI.Tests
             Assert.That(view.HasRequiredReferences, Is.True);
             Assert.That(controller.HasRequiredReferences, Is.True);
             Assert.That(modulePanel.HasRequiredReferences, Is.True);
-            Assert.That(modulePanel.Rows.Count, Is.EqualTo(18));
+            Assert.That(modulePanel.DomainPanels.Count, Is.EqualTo(CivicFeatureRegistry.Features.Count));
+            Assert.That(modulePanel.Rows.Count, Is.EqualTo(18 * CivicFeatureRegistry.Features.Count));
+            Assert.That(modulePanel.DomainPanels.Select(item => item.FeatureId), Is.EquivalentTo(CivicFeatureRegistry.Features.Select(item => item.Id)));
             Assert.That(view.ResourceDetailRows.Count, Is.EqualTo(30));
             Assert.That(view.ResourceSummaryLabels.Count, Is.EqualTo(30));
             Assert.That(view.ResourceProducerBoxes.Count, Is.EqualTo(120));
@@ -118,8 +121,11 @@ namespace Civic.UI.Tests
             Assert.That(CountChildrenNamed(hudBase, "TechnologiesPanelButton"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "ModulesPanelButton"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "ModulePanel"), Is.EqualTo(1));
-            Assert.That(CountChildrenNamed(hudBase, "ModuleActionRow01"), Is.EqualTo(1));
-            Assert.That(CountChildrenNamed(hudBase, "ModuleActionRow18"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "DomainPanel01"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "DomainPanel08"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "DomainActionRow01"), Is.EqualTo(8));
+            Assert.That(CountChildrenNamed(hudBase, "DomainActionRow18"), Is.EqualTo(8));
+            Assert.That(CountChildrenNamed(hudBase, "ModuleActionRow01"), Is.Zero);
             Assert.That(CountChildrenNamed(hudBase, "ResourceDetailRow01"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "ResourceDetailRow06"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "ResourceDetailRow30"), Is.EqualTo(1));

@@ -48,13 +48,16 @@ namespace Civic.Simulation.Modules
 
     public sealed class CivicPersonEffectDefinition
     {
-        public CivicPersonEffectDefinition(string personId, string effectType, string targetId, double amount, string capGroup)
+        public CivicPersonEffectDefinition(string personId, string effectType, string targetId, double amount, string capGroup, double duration = 0d, string runtimeEffectType = "", string runtimeTargetId = "")
         {
             PersonId = personId;
             EffectType = effectType;
             TargetId = targetId;
             Amount = amount;
             CapGroup = capGroup;
+            Duration = duration;
+            RuntimeEffectType = runtimeEffectType;
+            RuntimeTargetId = runtimeTargetId;
         }
 
         public string PersonId { get; }
@@ -62,11 +65,15 @@ namespace Civic.Simulation.Modules
         public string TargetId { get; }
         public double Amount { get; }
         public string CapGroup { get; }
+        public double Duration { get; }
+        public string RuntimeEffectType { get; }
+        public string RuntimeTargetId { get; }
+        public CivicResolvedModuleEffect Resolve() => CivicProvisionalEffect.Resolve(EffectType, TargetId, RuntimeEffectType, RuntimeTargetId, Amount, Duration, CapGroup);
     }
 
     public sealed class CivicPersonAbilityDefinition
     {
-        public CivicPersonAbilityDefinition(string personId, string id, string effectType, string targetId, double amount, double duration, int usesPerRun)
+        public CivicPersonAbilityDefinition(string personId, string id, string effectType, string targetId, double amount, double duration, int usesPerRun, string capGroup = "", string runtimeEffectType = "", string runtimeTargetId = "")
         {
             PersonId = personId;
             Id = id;
@@ -75,6 +82,9 @@ namespace Civic.Simulation.Modules
             Amount = amount;
             Duration = duration;
             UsesPerRun = usesPerRun;
+            CapGroup = capGroup;
+            RuntimeEffectType = runtimeEffectType;
+            RuntimeTargetId = runtimeTargetId;
         }
 
         public string PersonId { get; }
@@ -84,6 +94,10 @@ namespace Civic.Simulation.Modules
         public double Amount { get; }
         public double Duration { get; }
         public int UsesPerRun { get; }
+        public string CapGroup { get; }
+        public string RuntimeEffectType { get; }
+        public string RuntimeTargetId { get; }
+        public CivicResolvedModuleEffect Resolve() => CivicProvisionalEffect.Resolve(EffectType, TargetId, RuntimeEffectType, RuntimeTargetId, Amount, Duration, CapGroup);
     }
 
     public sealed class CivicPeopleContent
@@ -129,10 +143,12 @@ namespace Civic.Simulation.Modules
             var conditions = CivicCsvParser.Parse(conditionsCsv, errors, "person_conditions.csv").Select(row => new CivicPersonConditionDefinition(
                 Value(row, "personId"), Value(row, "metricId"), Value(row, "comparator"), Number(row, "value", errors, "person_conditions.csv"))).ToArray();
             var traits = CivicCsvParser.Parse(traitsCsv, errors, "person_traits.csv").Select(row => new CivicPersonEffectDefinition(
-                Value(row, "personId"), Value(row, "effectType"), Value(row, "targetId"), Number(row, "amount", errors, "person_traits.csv"), Value(row, "capGroup"))).ToArray();
+                Value(row, "personId"), Value(row, "effectType"), Value(row, "targetId"), Number(row, "amount", errors, "person_traits.csv"), Value(row, "capGroup"),
+                OptionalNumber(row, "duration", errors, "person_traits.csv"), Value(row, "runtimeEffectType"), Value(row, "runtimeTargetId"))).ToArray();
             var abilities = CivicCsvParser.Parse(abilitiesCsv, errors, "person_abilities.csv").Select(row => new CivicPersonAbilityDefinition(
                 Value(row, "personId"), Value(row, "id"), Value(row, "effectType"), Value(row, "targetId"), Number(row, "amount", errors, "person_abilities.csv"),
-                Number(row, "duration", errors, "person_abilities.csv"), Integer(row, "usesPerRun", errors, "person_abilities.csv"))).ToArray();
+                Number(row, "duration", errors, "person_abilities.csv"), Integer(row, "usesPerRun", errors, "person_abilities.csv"), Value(row, "capGroup"),
+                Value(row, "runtimeEffectType"), Value(row, "runtimeTargetId"))).ToArray();
 
             var ids = people.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
             foreach (var duplicate in people.GroupBy(item => item.Id, StringComparer.Ordinal).Where(group => group.Count() > 1)) errors.Add($"Duplicate person ID: {duplicate.Key}");
@@ -165,6 +181,8 @@ namespace Civic.Simulation.Modules
             errors.Add($"{source} has invalid number {key}: {raw}");
             return 0d;
         }
+
+        private static double OptionalNumber(IReadOnlyDictionary<string, string> row, string key, ICollection<string> errors, string source) => string.IsNullOrEmpty(Value(row, key)) ? 0d : Number(row, key, errors, source);
 
         private static IReadOnlyList<string> SplitIds(string value) => value.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).Select(item => item.Trim()).Where(item => item.Length > 0).Distinct(StringComparer.Ordinal).ToArray();
     }

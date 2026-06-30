@@ -1,0 +1,14 @@
+id,value,descriptionKo
+neutralLegitimacy,50,기본 정당성
+neutralSupport,0.50,기본 개혁 지지율
+basePoliticalCapitalPerSecond,1,초당 기본 정치력
+politicalCapitalLegitimacyBase,0.50,정당성 0일 때 정치력 생산 배율
+politicalCapitalLegitimacyWeight,0.01,정당성 1당 정치력 생산 배율
+supportLivingStandardWeight,0.002,생활수준 50 대비 1점당 개혁 지지 변화
+legitimacyLivingStandardWeight,0.20,생활수준 50 대비 1점당 정당성 변화
+livingStandardBase,20,생활수준 기본값
+livingStandardSupplyWeight,50,인구 소비자원 평균 공급률 가중치
+livingStandardGdpPerCapitaWeight,20,1인당 GDP 로그 가중치
+livingStandardTreasuryWeight,10,국고가 양수일 때 가산점
+livingStandardMinimum,0,생활수준 하한
+livingStandardMaximum,100,생활수준 상한

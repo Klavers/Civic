@@ -87,6 +87,7 @@ namespace Civic.Simulation.Modules
         public IReadOnlyList<CivicQueuedEventSnapshot> Queue => queue;
         public IReadOnlyList<CivicEventHistoryEntry> History => history;
         public IReadOnlyList<CivicEventEffectDefinition> InactiveEffects => inactiveEffects;
+        public int ProvisionalEffectCount => content.Effects.Count(item => item.EffectType == CivicProvisionalEffect.Planned);
         public bool IsSimulationPaused => queue.Any(item => item.Definition.PauseByDefault);
 
         public override void Initialize(CivicModuleContext context)
@@ -140,7 +141,7 @@ namespace Civic.Simulation.Modules
             ApplyChoice(queued.Definition, choice);
             queue.Remove(queued);
             history.Add(new CivicEventHistoryEntry(eventId, choiceId, Context.Telemetry.ElapsedSeconds));
-            cooldowns[eventId] = queued.Definition.CooldownSeconds;
+            cooldowns[eventId] = queued.Definition.CooldownSeconds * Context.Modifiers.Multiplier(CivicModifierEffectTypes.EventCooldownMultiplier, eventId, queued.Definition.Category, "*");
             accumulatedWeights[eventId] = 0d;
             eligibleDurations[eventId] = 0d;
             Context.Telemetry.SetExternalMetric("event.seen." + eventId, 1d);
@@ -168,14 +169,15 @@ namespace Civic.Simulation.Modules
 
                 eligibleDurations[definition.Id] += SchedulerIntervalSeconds;
                 var pity = definition.PitySeconds > 0d && eligibleDurations[definition.Id] + 1e-9d >= definition.PitySeconds;
-                var chance = Math.Min(0.95d, definition.BaseWeight + accumulatedWeights[definition.Id]);
+                var weightMultiplier = Context.Modifiers.Multiplier(CivicModifierEffectTypes.EventWeightMultiplier, definition.Id, definition.Category, "*");
+                var chance = Math.Min(0.95d, (definition.BaseWeight + accumulatedWeights[definition.Id]) * weightMultiplier);
                 if (pity || DeterministicRoll(definition.Id) < chance)
                 {
                     QueueEvent(definition, pity ? "누적 조건 확정" : "조건부 판정");
                 }
                 else
                 {
-                    accumulatedWeights[definition.Id] = Math.Min(0.95d, accumulatedWeights[definition.Id] + definition.BaseWeight);
+                    accumulatedWeights[definition.Id] = Math.Min(0.95d, accumulatedWeights[definition.Id] + definition.BaseWeight * weightMultiplier);
                 }
 
                 if (queue.Count >= QueueLimit) break;
@@ -250,23 +252,25 @@ namespace Civic.Simulation.Modules
         {
             foreach (var effect in content.Effects.Where(item => item.ChoiceId == choice.Id))
             {
-                if (effect.EffectType == "resourceGrant") Context.Simulation.GrantResource(effect.TargetId, CivicNumber.FromDouble(effect.Amount));
-                else if (effect.EffectType == "prestigeGrant") { Context.MetaProgress.PrestigePoints += (long)Math.Round(effect.Amount); }
-                else if (effect.EffectType == "politicalCapitalGrant") Context.GetModule<CivicPoliticsModule>(CivicFeatureRegistry.Politics)?.GrantPoliticalCapital(effect.Amount);
-                else if (effect.EffectType == "reformProgressAdd") Context.GetModule<CivicPoliticsModule>(CivicFeatureRegistry.Politics)?.AddReformProgress(effect.Amount);
-                else if (effect.EffectType == "wonderProgressAdd") Context.GetModule<CivicWonderModule>(CivicFeatureRegistry.Wonders)?.AddProgressFraction(effect.Amount);
-                else if (effect.EffectType == "flagSet") Context.Telemetry.SetExternalMetric("event.flag." + effect.TargetId, effect.Amount);
-                else if ((effect.EffectType == "planned" || !DirectModifierEffects.Contains(effect.EffectType)) && !inactiveEffects.Contains(effect)) inactiveEffects.Add(effect);
-                else ApplyModifier(definition.Id, choice.Id, effect);
+                var resolved = effect.Resolve();
+                if (resolved.EffectType == "resourceGrant") Context.Simulation.GrantResource(resolved.TargetId, CivicNumber.FromDouble(resolved.Amount));
+                else if (resolved.EffectType == "prestigeGrant") { Context.MetaProgress.PrestigePoints += (long)Math.Round(resolved.Amount); }
+                else if (resolved.EffectType == "politicalCapitalGrant") Context.GetModule<CivicPoliticsModule>(CivicFeatureRegistry.Politics)?.GrantPoliticalCapital(resolved.Amount);
+                else if (resolved.EffectType == "reformProgressAdd") Context.GetModule<CivicPoliticsModule>(CivicFeatureRegistry.Politics)?.AddReformProgress(resolved.Amount);
+                else if (resolved.EffectType == "wonderProgressAdd") Context.GetModule<CivicWonderModule>(CivicFeatureRegistry.Wonders)?.AddProgressFraction(resolved.Amount);
+                else if (resolved.EffectType == "flagSet") Context.Telemetry.SetExternalMetric("event.flag." + resolved.TargetId, resolved.Amount);
+                else if (!resolved.IsProvisional && !DirectModifierEffects.Contains(resolved.EffectType)) { if (!inactiveEffects.Contains(effect)) inactiveEffects.Add(effect); }
+                else ApplyModifier(definition.Id, choice.Id, effect, resolved);
             }
         }
 
-        private void ApplyModifier(string eventId, string choiceId, CivicEventEffectDefinition effect)
+        private void ApplyModifier(string eventId, string choiceId, CivicEventEffectDefinition effect, CivicResolvedModuleEffect resolved)
         {
-            var group = string.IsNullOrEmpty(effect.StackGroup) ? effect.EffectType + ":" + effect.TargetId : effect.StackGroup;
+            var group = string.IsNullOrEmpty(effect.StackGroup) ? resolved.EffectType + ":" + resolved.TargetId : effect.StackGroup;
             var sourceId = eventId + ":" + group;
-            Context.Modifiers.ReplaceSource("event", sourceId, new[] { new CivicModifierEntry("event", sourceId, effect.EffectType, effect.TargetId, effect.Amount, group) });
-            if (effect.Duration > 0d) timedEffects[sourceId] = effect.Duration;
+            var capGroup = string.IsNullOrEmpty(resolved.CapGroup) ? group : resolved.CapGroup;
+            Context.Modifiers.ReplaceSource("event", sourceId, new[] { new CivicModifierEntry("event", sourceId, resolved.EffectType, resolved.TargetId, resolved.Amount, capGroup) });
+            if (resolved.Duration > 0d) timedEffects[sourceId] = resolved.Duration;
         }
 
         private void AdvanceTimedEffects(double elapsed)

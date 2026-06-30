@@ -67,6 +67,7 @@ namespace Civic.Simulation.Modules
             .ToArray();
         public IReadOnlyCollection<string> RetiredIds => retiredIds;
         public IReadOnlyList<object> InactiveEffects => inactiveEffects;
+        public int ProvisionalEffectCount => content.Traits.Count(item => item.EffectType == CivicProvisionalEffect.Planned) + content.Abilities.Count(item => item.EffectType == CivicProvisionalEffect.Planned);
 
         public override void Initialize(CivicModuleContext context)
         {
@@ -133,22 +134,19 @@ namespace Civic.Simulation.Modules
             var ability = content.Abilities.FirstOrDefault(item => item.PersonId == personId);
             if (ability == null) return false;
             abilityUses[personId]--;
-            if (ability.EffectType == "resourceGrant")
+            var resolved = ability.Resolve();
+            if (resolved.EffectType == "resourceGrant")
             {
-                Context.Simulation.GrantResource(ability.TargetId, CivicNumber.FromDouble(ability.Amount));
-            }
-            else if (ability.EffectType == "planned")
-            {
-                if (!inactiveEffects.Contains(ability)) inactiveEffects.Add(ability);
+                Context.Simulation.GrantResource(resolved.TargetId, CivicNumber.FromDouble(resolved.Amount));
             }
             else
             {
                 var sourceId = personId + ":" + ability.Id;
                 Context.Modifiers.ReplaceSource("personAbility", sourceId, new[]
                 {
-                    new CivicModifierEntry("personAbility", sourceId, ability.EffectType, ability.TargetId, ability.Amount)
+                    new CivicModifierEntry("personAbility", sourceId, resolved.EffectType, resolved.TargetId, resolved.Amount, resolved.CapGroup)
                 });
-                if (ability.Duration > 0d) timedAbilityRemaining[sourceId] = ability.Duration;
+                if (resolved.Duration > 0d) timedAbilityRemaining[sourceId] = resolved.Duration;
             }
 
             Context.Simulation.RefreshSnapshot();
@@ -170,7 +168,7 @@ namespace Civic.Simulation.Modules
             foreach (var person in eligible)
             {
                 appearedIds.Add(person.Id);
-                candidateRemaining[person.Id] = CandidateLifetime;
+                candidateRemaining[person.Id] = CandidateLifetime * Context.Modifiers.Multiplier(CivicModifierEffectTypes.PersonCandidateWeightMultiplier, person.Id, "*");
             }
         }
 
@@ -203,13 +201,8 @@ namespace Civic.Simulation.Modules
                 var scale = assignmentCounts[assignment] == 1 ? 1d : assignmentCounts[assignment] == 2 ? 0.70d : 0.50d;
                 foreach (var trait in content.Traits.Where(item => item.PersonId == personId))
                 {
-                    if (trait.EffectType == "planned")
-                    {
-                        if (!inactiveEffects.Contains(trait)) inactiveEffects.Add(trait);
-                        continue;
-                    }
-
-                    Context.Modifiers.Add(new CivicModifierEntry("person", personId, trait.EffectType, trait.TargetId, trait.Amount * scale, trait.CapGroup));
+                    var resolved = trait.Resolve();
+                    Context.Modifiers.Add(new CivicModifierEntry("person", personId, resolved.EffectType, resolved.TargetId, resolved.Amount * scale, resolved.CapGroup));
                 }
             }
 
@@ -222,9 +215,11 @@ namespace Civic.Simulation.Modules
             assignments.Remove(personId);
             Context.Modifiers.RemoveSource("person", personId);
             retiredIds.Add(personId);
-            foreach (var trait in content.Traits.Where(item => item.PersonId == personId && item.EffectType != "planned"))
+            foreach (var trait in content.Traits.Where(item => item.PersonId == personId))
             {
-                Context.Modifiers.Add(new CivicModifierEntry("personLegacy", personId, trait.EffectType, trait.TargetId, trait.Amount * RetiredLegacyRatio, trait.CapGroup));
+                var resolved = trait.Resolve();
+                var legacyRatio = RetiredLegacyRatio * Context.Modifiers.Multiplier(CivicModifierEffectTypes.PersonLegacyMultiplier, personId, "*");
+                Context.Modifiers.Add(new CivicModifierEntry("personLegacy", personId, resolved.EffectType, resolved.TargetId, resolved.Amount * legacyRatio, resolved.CapGroup));
             }
 
             RebuildTraitModifiers();

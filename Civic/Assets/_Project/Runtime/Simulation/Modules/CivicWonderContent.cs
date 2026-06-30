@@ -66,7 +66,7 @@ namespace Civic.Simulation.Modules
 
     public sealed class CivicWonderEffectDefinition
     {
-        public CivicWonderEffectDefinition(string wonderId, string effectType, string targetId, double amount, double duration, string capGroup)
+        public CivicWonderEffectDefinition(string wonderId, string effectType, string targetId, double amount, double duration, string capGroup, string runtimeEffectType = "", string runtimeTargetId = "")
         {
             WonderId = wonderId;
             EffectType = effectType;
@@ -74,6 +74,8 @@ namespace Civic.Simulation.Modules
             Amount = amount;
             Duration = duration;
             CapGroup = capGroup;
+            RuntimeEffectType = runtimeEffectType;
+            RuntimeTargetId = runtimeTargetId;
         }
 
         public string WonderId { get; }
@@ -82,6 +84,9 @@ namespace Civic.Simulation.Modules
         public double Amount { get; }
         public double Duration { get; }
         public string CapGroup { get; }
+        public string RuntimeEffectType { get; }
+        public string RuntimeTargetId { get; }
+        public CivicResolvedModuleEffect Resolve() => CivicProvisionalEffect.Resolve(EffectType, TargetId, RuntimeEffectType, RuntimeTargetId, Amount, Duration, CapGroup);
     }
 
     public sealed class CivicWonderContent
@@ -131,7 +136,7 @@ namespace Civic.Simulation.Modules
                 Value(row, "wonderId"), Value(row, "metricId"), Value(row, "comparator"), Number(row, "value", errors, "wonder_conditions.csv"))).ToArray();
             var effects = CivicCsvParser.Parse(effectsCsv, errors, "wonder_effects.csv").Select(row => new CivicWonderEffectDefinition(
                 Value(row, "wonderId"), Value(row, "effectType"), Value(row, "targetId"), Number(row, "amount", errors, "wonder_effects.csv"),
-                Number(row, "duration", errors, "wonder_effects.csv"), Value(row, "capGroup"))).ToArray();
+                Number(row, "duration", errors, "wonder_effects.csv"), Value(row, "capGroup"), Value(row, "runtimeEffectType"), Value(row, "runtimeTargetId"))).ToArray();
 
             var ids = wonders.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
             foreach (var duplicate in wonders.GroupBy(item => item.Id, StringComparer.Ordinal).Where(group => group.Count() > 1)) errors.Add($"Duplicate wonder ID: {duplicate.Key}");

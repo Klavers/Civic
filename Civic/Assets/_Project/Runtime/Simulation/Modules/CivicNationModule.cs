@@ -52,6 +52,7 @@ namespace Civic.Simulation.Modules
         public string CurrentNationId { get; private set; } = string.Empty;
         public IReadOnlyList<CivicNationCandidateSnapshot> Snapshot => snapshot;
         public IReadOnlyList<CivicNationEffectDefinition> InactiveEffects => inactiveEffects;
+        public int ProvisionalEffectCount => string.IsNullOrEmpty(CurrentNationId) ? 0 : content.Effects.Count(item => item.NationId == CurrentNationId && item.EffectType == CivicProvisionalEffect.Planned);
 
         public override void Initialize(CivicModuleContext context)
         {
@@ -69,7 +70,10 @@ namespace Civic.Simulation.Modules
                 var nation = content.Nations.First(item => item.Id == preparingNationId);
                 if (ConditionsSatisfied(nation))
                 {
-                    preparationProgress[nation.Id] = Math.Min(nation.PreparationSeconds, preparationProgress[nation.Id] + Math.Max(0d, seconds));
+                    var preparationSpeed = Context.Modifiers.Multiplier(CivicModifierEffectTypes.NationPreparationSpeedMultiplier, nation.Id, "*");
+                    var conditionDuration = Context.Modifiers.Multiplier(CivicModifierEffectTypes.NationConditionDurationMultiplier, nation.Id, "*");
+                    var effectiveSeconds = Math.Max(0d, seconds) * preparationSpeed / Math.Max(0.1d, conditionDuration);
+                    preparationProgress[nation.Id] = Math.Min(nation.PreparationSeconds, preparationProgress[nation.Id] + effectiveSeconds);
                     if (preparationProgress[nation.Id] + 1e-9d >= nation.PreparationSeconds)
                     {
                         awaitingCharterNationId = nation.Id;
@@ -136,13 +140,8 @@ namespace Civic.Simulation.Modules
         {
             foreach (var effect in content.Effects.Where(item => item.NationId == nationId && (item.CharterId == charterId || item.CharterId == "default")))
             {
-                if (effect.EffectType == "planned")
-                {
-                    if (!inactiveEffects.Contains(effect)) inactiveEffects.Add(effect);
-                    continue;
-                }
-
-                Context.Modifiers.Add(new CivicModifierEntry("nation", nationId, effect.EffectType, effect.TargetId, effect.Amount, effect.CapGroup));
+                var resolved = effect.Resolve();
+                Context.Modifiers.Add(new CivicModifierEntry("nation", nationId, resolved.EffectType, resolved.TargetId, resolved.Amount, resolved.CapGroup));
             }
         }
 

@@ -10,6 +10,7 @@ namespace Civic.Simulation.Modules
         private readonly HashSet<string> everBuiltIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> researchedIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly Dictionary<string, double> externalMetrics = new Dictionary<string, double>(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> technologyAliases = new Dictionary<string, string>(StringComparer.Ordinal);
 
         public CivicRunTelemetry(CivicGameSimulation simulation)
         {
@@ -90,6 +91,15 @@ namespace Civic.Simulation.Modules
             }
 
             externalMetrics[metricId] = value;
+        }
+
+        public void SetTechnologyAliases(IEnumerable<CivicTechnologyAliasDefinition> aliases)
+        {
+            technologyAliases.Clear();
+            foreach (var alias in aliases ?? Array.Empty<CivicTechnologyAliasDefinition>())
+            {
+                technologyAliases[alias.SemanticTechnologyId] = alias.MappedTechnologyId;
+            }
         }
 
         public double GetMetric(string metricId, CivicMetaProgress metaProgress)
@@ -206,7 +216,9 @@ namespace Civic.Simulation.Modules
 
             if (metricId.StartsWith("technology.researched.", StringComparison.Ordinal))
             {
-                return researchedIds.Contains(metricId.Substring("technology.researched.".Length)) ? 1d : 0d;
+                var requestedId = metricId.Substring("technology.researched.".Length);
+                var resolvedId = technologyAliases.TryGetValue(requestedId, out var mappedId) ? mappedId : requestedId;
+                return researchedIds.Contains(resolvedId) ? 1d : 0d;
             }
 
             if (metricId == "technology.unresearchedPreviousCount")

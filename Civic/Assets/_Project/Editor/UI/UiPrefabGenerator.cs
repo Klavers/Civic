@@ -775,17 +775,11 @@ namespace Civic.Editor.UI
             panel.GetComponent<Image>().color = new Color(0.075f, 0.10f, 0.14f, 0.995f);
             panel.transform.SetAsLastSibling();
 
-            var title = GetOrCreateText(panel.transform, "TitleLabel");
-            title.text = "모듈";
-            title.fontSize = 28;
-            title.alignment = TextAnchor.MiddleLeft;
-            SetRect(title.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(22f, -34f), new Vector2(-190f, 50f));
-            var status = GetOrCreateText(panel.transform, "StatusLabel");
-            status.text = "모듈 상태";
-            status.fontSize = 15;
-            status.color = new Color(0.70f, 0.78f, 0.88f, 1f);
-            status.alignment = TextAnchor.MiddleLeft;
-            SetRect(status.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(22f, -76f), new Vector2(-190f, 34f));
+            foreach (var legacyName in new[] { "TitleLabel", "StatusLabel", "ModuleScroll" })
+            {
+                var legacy = panel.transform.Find(legacyName);
+                if (legacy != null) UnityEngine.Object.DestroyImmediate(legacy.gameObject);
+            }
             var closeButton = GetOrCreateButton(panel.transform, "CloseButton");
             SetRect(closeButton.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-70f, -36f), new Vector2(100f, 48f));
             closeButton.GetComponent<Image>().color = new Color(0.24f, 0.29f, 0.36f, 1f);
@@ -820,21 +814,65 @@ namespace Civic.Editor.UI
                 tabLabels[index] = label;
             }
 
-            var scroll = CreateScrollArea(panel.transform, "ModuleScroll", rowCount * 72f, 210f);
+            var domainPanels = new CivicDomainPanelView[CivicFeatureRegistry.Features.Count];
+            for (var index = 0; index < domainPanels.Length; index++)
+            {
+                domainPanels[index] = CreateDomainPanel(panel.transform, CivicFeatureRegistry.Features[index], tooltipView, rowCount, index);
+            }
+
+            var view = GetOrAdd<CivicModulePanelView>(root);
+            var serialized = new SerializedObject(view);
+            serialized.FindProperty("openButton").objectReferenceValue = openButton;
+            serialized.FindProperty("panelRoot").objectReferenceValue = panel;
+            serialized.FindProperty("closeButton").objectReferenceValue = closeButton;
+            AssignObjectArray(serialized, "tabRoots", tabRoots);
+            AssignObjectArray(serialized, "tabButtons", tabButtons);
+            AssignObjectArray(serialized, "tabLabels", tabLabels);
+            AssignObjectArray(serialized, "domainPanels", domainPanels);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            panel.SetActive(false);
+            return view;
+        }
+
+        private static CivicDomainPanelView CreateDomainPanel(
+            Transform parent,
+            CivicFeatureDefinition definition,
+            CivicTooltipView tooltipView,
+            int rowCount,
+            int domainIndex)
+        {
+            var root = GetOrCreateChild(parent, $"DomainPanel{domainIndex + 1:00}", typeof(RectTransform), typeof(Image));
+            SetStretchRect(root.GetComponent<RectTransform>(), 18f, 205f, 18f, 18f);
+            root.GetComponent<Image>().color = new Color(0.055f, 0.075f, 0.105f, 0.98f);
+
+            var title = GetOrCreateText(root.transform, "TitleLabel");
+            title.text = definition.DisplayName;
+            title.fontSize = 26;
+            title.alignment = TextAnchor.MiddleLeft;
+            SetRect(title.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, -28f), new Vector2(-36f, 44f));
+            var status = GetOrCreateText(root.transform, "StatusLabel");
+            status.text = "도메인 상태";
+            status.fontSize = 15;
+            status.color = new Color(0.70f, 0.78f, 0.88f, 1f);
+            status.alignment = TextAnchor.MiddleLeft;
+            SetRect(status.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, -66f), new Vector2(-36f, 30f));
+
+            var scroll = CreateScrollArea(root.transform, "DomainScroll", rowCount * 72f, 92f);
             var rows = new CivicModuleActionRow[rowCount];
-            var expectedNames = new HashSet<string>(Enumerable.Range(1, rowCount).Select(index => $"ModuleActionRow{index:00}"));
+            var expectedNames = new HashSet<string>(Enumerable.Range(1, rowCount).Select(index => $"DomainActionRow{index:00}"));
             for (var index = scroll.Content.childCount - 1; index >= 0; index--)
             {
                 var child = scroll.Content.GetChild(index);
-                if (child.name.StartsWith("ModuleActionRow", StringComparison.Ordinal) && !expectedNames.Contains(child.name)) UnityEngine.Object.DestroyImmediate(child.gameObject);
+                if (child.name.StartsWith("DomainActionRow", StringComparison.Ordinal) && !expectedNames.Contains(child.name)) UnityEngine.Object.DestroyImmediate(child.gameObject);
             }
+
             for (var index = 0; index < rowCount; index++)
             {
-                var row = GetOrCreateChild(scroll.Content, $"ModuleActionRow{index + 1:00}", typeof(RectTransform), typeof(Image));
+                var row = GetOrCreateChild(scroll.Content, $"DomainActionRow{index + 1:00}", typeof(RectTransform), typeof(Image));
                 SetTopStretchRect(row.GetComponent<RectTransform>(), 0f, index * 72f, 0f, 64f);
-                row.GetComponent<Image>().color = new Color(0.045f, 0.065f, 0.09f, 1f);
+                row.GetComponent<Image>().color = new Color(0.035f, 0.055f, 0.08f, 1f);
                 var info = GetOrCreateText(row.transform, "InfoLabel");
-                info.text = "모듈 항목";
+                info.text = definition.DisplayName + " 항목";
                 info.fontSize = 16;
                 info.alignment = TextAnchor.MiddleLeft;
                 SetStretchRect(info.rectTransform, 14f, 6f, 200f, 6f);
@@ -858,19 +896,15 @@ namespace Civic.Editor.UI
                 rows[index] = component;
             }
 
-            var view = GetOrAdd<CivicModulePanelView>(root);
+            var view = GetOrAdd<CivicDomainPanelView>(root);
             var serialized = new SerializedObject(view);
-            serialized.FindProperty("openButton").objectReferenceValue = openButton;
-            serialized.FindProperty("panelRoot").objectReferenceValue = panel;
-            serialized.FindProperty("closeButton").objectReferenceValue = closeButton;
+            serialized.FindProperty("featureId").stringValue = definition.Id;
+            serialized.FindProperty("panelRoot").objectReferenceValue = root;
             serialized.FindProperty("titleLabel").objectReferenceValue = title;
             serialized.FindProperty("statusLabel").objectReferenceValue = status;
-            AssignObjectArray(serialized, "tabRoots", tabRoots);
-            AssignObjectArray(serialized, "tabButtons", tabButtons);
-            AssignObjectArray(serialized, "tabLabels", tabLabels);
             AssignObjectArray(serialized, "rows", rows);
             serialized.ApplyModifiedPropertiesWithoutUndo();
-            panel.SetActive(false);
+            root.SetActive(domainIndex == 0);
             return view;
         }
 

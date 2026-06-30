@@ -52,7 +52,7 @@ namespace Civic.Simulation.Modules
 
     public sealed class CivicNationEffectDefinition
     {
-        public CivicNationEffectDefinition(string nationId, string charterId, string effectType, string targetId, double amount, string capGroup)
+        public CivicNationEffectDefinition(string nationId, string charterId, string effectType, string targetId, double amount, string capGroup, double duration = 0d, string runtimeEffectType = "", string runtimeTargetId = "")
         {
             NationId = nationId;
             CharterId = charterId;
@@ -60,6 +60,9 @@ namespace Civic.Simulation.Modules
             TargetId = targetId;
             Amount = amount;
             CapGroup = capGroup;
+            Duration = duration;
+            RuntimeEffectType = runtimeEffectType;
+            RuntimeTargetId = runtimeTargetId;
         }
 
         public string NationId { get; }
@@ -68,6 +71,10 @@ namespace Civic.Simulation.Modules
         public string TargetId { get; }
         public double Amount { get; }
         public string CapGroup { get; }
+        public double Duration { get; }
+        public string RuntimeEffectType { get; }
+        public string RuntimeTargetId { get; }
+        public CivicResolvedModuleEffect Resolve() => CivicProvisionalEffect.Resolve(EffectType, TargetId, RuntimeEffectType, RuntimeTargetId, Amount, Duration, CapGroup);
     }
 
     public sealed class CivicNationContent
@@ -114,7 +121,8 @@ namespace Civic.Simulation.Modules
                 Number(row, "value", errors, "nation_conditions.csv"), Value(row, "alternativeGroup"))).ToArray();
             var effects = CivicCsvParser.Parse(effectsCsv, errors, "nation_effects.csv").Select(row => new CivicNationEffectDefinition(
                 Value(row, "nationId"), Value(row, "charterId"), Value(row, "effectType"), Value(row, "targetId"),
-                Number(row, "amount", errors, "nation_effects.csv"), Value(row, "capGroup"))).ToArray();
+                Number(row, "amount", errors, "nation_effects.csv"), Value(row, "capGroup"), OptionalNumber(row, "duration", errors, "nation_effects.csv"),
+                Value(row, "runtimeEffectType"), Value(row, "runtimeTargetId"))).ToArray();
 
             var ids = nations.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
             foreach (var duplicate in nations.GroupBy(item => item.Id, StringComparer.Ordinal).Where(group => group.Count() > 1)) errors.Add($"Duplicate nation ID: {duplicate.Key}");
@@ -147,6 +155,8 @@ namespace Civic.Simulation.Modules
             errors.Add($"{source} has invalid number {key}: {raw}");
             return 0d;
         }
+
+        private static double OptionalNumber(IReadOnlyDictionary<string, string> row, string key, ICollection<string> errors, string source) => string.IsNullOrEmpty(Value(row, key)) ? 0d : Number(row, key, errors, source);
 
         private static bool Boolean(IReadOnlyDictionary<string, string> row, string key, ICollection<string> errors, string source)
         {

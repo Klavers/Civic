@@ -19,7 +19,8 @@ namespace Civic.Simulation.Modules
             CivicNationContent nationContent = null,
             CivicWonderContent wonderContent = null,
             CivicPeopleContent peopleContent = null,
-            CivicEventContent eventContent = null)
+            CivicEventContent eventContent = null,
+            CivicModuleBalanceContent balanceContent = null)
         {
             Simulation = simulation ?? throw new ArgumentNullException(nameof(simulation));
             Features = features ?? throw new ArgumentNullException(nameof(features));
@@ -31,6 +32,13 @@ namespace Civic.Simulation.Modules
             metaStore = metaStore ?? CivicMetaSession.Store;
             MetaProgress = metaStore.Load() ?? new CivicMetaProgress();
             Telemetry = new CivicRunTelemetry(simulation);
+            if (features.EnabledFeatureIds.Count > 0)
+            {
+                var balances = balanceContent ?? CivicModuleBalanceContentLoader.LoadFromResources();
+                balances.ValidateAgainst(simulation.Data);
+                simulation.Modifiers.ConfigureCaps(balances.ModifierCaps);
+                Telemetry.SetTechnologyAliases(balances.TechnologyAliases);
+            }
             if (features.IsEnabled(CivicFeatureRegistry.StartCivilizations))
             {
                 var civilizations = civilizationContent ?? CivicCivilizationContentLoader.LoadFromResources();

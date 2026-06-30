@@ -28,13 +28,16 @@ namespace Civic.Simulation.Modules
 
     public sealed class CivicCivilizationEffectDefinition
     {
-        public CivicCivilizationEffectDefinition(string civilizationId, string effectType, string targetId, double amount, string capGroup)
+        public CivicCivilizationEffectDefinition(string civilizationId, string effectType, string targetId, double amount, string capGroup, double duration = 0d, string runtimeEffectType = "", string runtimeTargetId = "")
         {
             CivilizationId = civilizationId;
             EffectType = effectType;
             TargetId = targetId;
             Amount = amount;
             CapGroup = capGroup;
+            Duration = duration;
+            RuntimeEffectType = runtimeEffectType;
+            RuntimeTargetId = runtimeTargetId;
         }
 
         public string CivilizationId { get; }
@@ -42,6 +45,10 @@ namespace Civic.Simulation.Modules
         public string TargetId { get; }
         public double Amount { get; }
         public string CapGroup { get; }
+        public double Duration { get; }
+        public string RuntimeEffectType { get; }
+        public string RuntimeTargetId { get; }
+        public CivicResolvedModuleEffect Resolve() => CivicProvisionalEffect.Resolve(EffectType, TargetId, RuntimeEffectType, RuntimeTargetId, Amount, Duration, CapGroup);
     }
 
     public sealed class CivicCivilizationStartDefinition
@@ -112,7 +119,10 @@ namespace Civic.Simulation.Modules
                     Value(row, "effectType"),
                     Value(row, "targetId"),
                     Number(row, "amount", errors, "civilization_effects.csv"),
-                    Value(row, "capGroup")))
+                    Value(row, "capGroup"),
+                    OptionalNumber(row, "duration", errors, "civilization_effects.csv"),
+                    Value(row, "runtimeEffectType"),
+                    Value(row, "runtimeTargetId")))
                 .ToArray();
             var startDefinitions = CivicCsvParser.Parse(startsCsv, errors, "civilization_start.csv")
                 .Select(row => new CivicCivilizationStartDefinition(
@@ -158,6 +168,8 @@ namespace Civic.Simulation.Modules
             errors.Add($"{source} has invalid number {key}: {raw}");
             return 0d;
         }
+
+        private static double OptionalNumber(IReadOnlyDictionary<string, string> row, string key, ICollection<string> errors, string source) => string.IsNullOrEmpty(Value(row, key)) ? 0d : Number(row, key, errors, source);
 
         private static IReadOnlyList<string> SplitIds(string value) => value
             .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)

@@ -133,5 +133,26 @@ namespace Civic.UI.Tests
             Assert.DoesNotThrow(() => controller.View.FoodToggleButton.onClick.Invoke());
             Assert.That(controller.Simulation.Snapshot.Resources.Any(resource => resource.Category == ResourceCategory.Aggregate), Is.True);
         }
+
+        [UnityTest]
+        public IEnumerator CivicHud_AllModulesUseSeparateDomainPanels()
+        {
+            CivicFeatureRuntime.ConfigureAndBeginForTests(CivicFeatureRegistry.Features.Select(item => item.Id));
+            SceneManager.LoadScene("SampleScene");
+            yield return null;
+            yield return null;
+
+            var controller = Object.FindFirstObjectByType<CivicHudController>();
+            var modulePanel = controller.ModulePanelView;
+            Assert.That(modulePanel.HasRequiredReferences, Is.True);
+            Assert.That(modulePanel.DomainPanels.Count, Is.EqualTo(8));
+            Assert.That(modulePanel.DomainPanels.Select(item => item.FeatureId), Is.EquivalentTo(CivicFeatureRegistry.Features.Select(item => item.Id)));
+
+            modulePanel.OpenButton.onClick.Invoke();
+            yield return null;
+            Assert.That(modulePanel.PanelRoot.activeSelf, Is.True);
+            Assert.That(modulePanel.DomainPanels.Count(item => item.PanelRoot.activeSelf), Is.EqualTo(1));
+            Assert.That(modulePanel.DomainPanels.Single(item => item.PanelRoot.activeSelf).Rows.Any(row => row.gameObject.activeSelf), Is.True);
+        }
     }
 }
