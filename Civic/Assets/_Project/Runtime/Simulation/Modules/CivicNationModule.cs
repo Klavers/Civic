@@ -55,6 +55,7 @@ namespace Civic.Simulation.Modules
         public IReadOnlyList<CivicNationDefinition> Definitions => content.Nations;
         public IReadOnlyList<CivicNationEffectDefinition> InactiveEffects => inactiveEffects;
         public int ProvisionalEffectCount => string.IsNullOrEmpty(CurrentNationId) ? 0 : content.Effects.Count(item => item.NationId == CurrentNationId && item.EffectType == CivicProvisionalEffect.Planned);
+        public bool DebugInstantActionsEnabled { get; private set; }
 
         public IReadOnlyList<CivicNationConditionDefinition> ConditionsFor(string nationId) => content.Conditions.Where(item => item.NationId == nationId).ToArray();
         public IReadOnlyList<CivicNationEffectDefinition> EffectsFor(string nationId) => content.Effects.Where(item => item.NationId == nationId).ToArray();
@@ -106,6 +107,21 @@ namespace Civic.Simulation.Modules
             return true;
         }
 
+        public void SetDebugInstantActions(bool enabled)
+        {
+            DebugInstantActionsEnabled = enabled;
+        }
+
+        public bool DebugFormImmediately(string nationId)
+        {
+            if (content.Nations.All(item => item.Id != nationId) || nationId == CurrentNationId) return false;
+            debugReadyIds.Add(nationId);
+            preparingNationId = string.Empty;
+            awaitingCharterNationId = nationId;
+            preparationProgress[nationId] = content.Nations.First(item => item.Id == nationId).PreparationSeconds;
+            return TryCompleteFormation();
+        }
+
         public override void Initialize(CivicModuleContext context)
         {
             base.Initialize(context);
@@ -141,6 +157,7 @@ namespace Civic.Simulation.Modules
 
         public bool TryDeclare(string nationId)
         {
+            if (DebugInstantActionsEnabled) return DebugFormImmediately(nationId);
             var nation = content.Nations.FirstOrDefault(item => item.Id == nationId);
             if (nation == null || !IsAvailable(nation, out _) || !ConditionsSatisfied(nation)) return false;
             if (Context.Simulation.State.Resources["treasury"].ToDouble() + 1e-9d < nation.TreasuryCost) return false;

@@ -40,6 +40,7 @@ namespace Civic.Simulation.Modules
         private readonly HashSet<string> completedIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly Dictionary<string, double> timedEffectRemaining = new Dictionary<string, double>(StringComparer.Ordinal);
         private readonly List<CivicWonderEffectDefinition> inactiveEffects = new List<CivicWonderEffectDefinition>();
+        private readonly HashSet<string> debugUnlockedIds = new HashSet<string>(StringComparer.Ordinal);
         private string activeProjectId;
         private double activeProgressBonus;
         private IReadOnlyList<CivicWonderSnapshot> snapshot = Array.Empty<CivicWonderSnapshot>();
@@ -56,6 +57,7 @@ namespace Civic.Simulation.Modules
         public IReadOnlyList<CivicWonderSnapshot> Snapshot => snapshot;
         public IReadOnlyList<CivicWonderEffectDefinition> InactiveEffects => inactiveEffects;
         public int ProvisionalEffectCount => content.Effects.Count(item => item.EffectType == CivicProvisionalEffect.Planned);
+        public bool DebugInstantActionsEnabled { get; private set; }
 
         public IReadOnlyList<CivicWonderCostDefinition> CostsFor(string wonderId) => Costs(wonderId).ToArray();
         public IReadOnlyList<CivicWonderConditionDefinition> ConditionsFor(string wonderId) => content.Conditions.Where(item => item.WonderId == wonderId).ToArray();
@@ -78,6 +80,48 @@ namespace Civic.Simulation.Modules
             if (costs.Length == 0) return 0d;
             var progressMultiplier = Context.Modifiers.Multiplier(CivicModifierEffectTypes.WonderProgressMultiplier, wonderId, "*");
             return costs.Max(cost => EffectiveCostAmount(cost, wonderId) / Math.Max(1e-9d, cost.DeliveryRate * progressMultiplier));
+        }
+
+        public void SetDebugInstantActions(bool enabled)
+        {
+            DebugInstantActionsEnabled = enabled;
+        }
+
+        public bool DebugPrepare(string wonderId)
+        {
+            var wonder = content.Wonders.FirstOrDefault(item => item.Id == wonderId);
+            if (wonder == null || completedIds.Contains(wonderId)) return false;
+            debugUnlockedIds.Add(wonderId);
+            if (!string.IsNullOrEmpty(wonder.TechnologyId)) Context.Simulation.GrantTechnology(wonder.TechnologyId);
+            Context.Simulation.GrantResource("treasury", CivicNumber.FromDouble(wonder.UpfrontTreasury + 999d));
+            foreach (var cost in Costs(wonderId))
+            {
+                if (cost.ResourceId == "food")
+                {
+                    var food = Context.Simulation.Data.Resources.FirstOrDefault(item => item.Category == ResourceCategory.Element && item.FoodConversion > 0d);
+                    if (food != null) Context.Simulation.GrantResource(food.Id, CivicNumber.FromDouble(cost.Amount / food.FoodConversion));
+                }
+                else
+                {
+                    Context.Simulation.GrantResource(cost.ResourceId, CivicNumber.FromDouble(cost.Amount));
+                }
+            }
+            RebuildSnapshot();
+            return true;
+        }
+
+        public bool DebugCompleteImmediately(string wonderId)
+        {
+            var wonder = content.Wonders.FirstOrDefault(item => item.Id == wonderId);
+            if (wonder == null || completedIds.Contains(wonderId)) return false;
+            if (!string.IsNullOrEmpty(activeProjectId) && activeProjectId != wonderId) CancelActiveProject();
+            debugUnlockedIds.Add(wonderId);
+            activeProjectId = wonderId;
+            activeProgressBonus = 1d;
+            Complete(wonderId);
+            Context.Simulation.RefreshSnapshot();
+            RebuildSnapshot();
+            return true;
         }
 
         public override void Initialize(CivicModuleContext context)
@@ -108,6 +152,7 @@ namespace Civic.Simulation.Modules
 
         public bool TryStart(string wonderId)
         {
+            if (DebugInstantActionsEnabled) return DebugCompleteImmediately(wonderId);
             if (!string.IsNullOrEmpty(activeProjectId) || completedIds.Contains(wonderId)) return false;
             var wonder = content.Wonders.FirstOrDefault(item => item.Id == wonderId);
             if (wonder == null || !IsUnlocked(wonder, out _)) return false;
@@ -263,6 +308,11 @@ namespace Civic.Simulation.Modules
 
         private bool IsUnlocked(CivicWonderDefinition wonder, out string reason)
         {
+            if (debugUnlockedIds.Contains(wonder.Id))
+            {
+                reason = string.Empty;
+                return true;
+            }
             var missing = wonder.RequiredFeatureIds.FirstOrDefault(id => !Context.IsFeatureEnabled(id));
             if (missing != null)
             {

@@ -154,7 +154,17 @@ namespace Civic.UI
                 domainPanel.Rows[index].gameObject.SetActive(visible);
                 if (!visible) continue;
                 var entry = entries[index];
-                domainPanel.Rows[index].Bind(entry.Key, entry.Info, entry.Description, entry.Action, entry.Interactable, entry.Tooltip, key => ActionRequested?.Invoke(selectedFeatureId, key));
+                var row = domainPanel.Rows[index];
+                row.Bind(entry.Key, entry.Info, entry.Description, entry.Action, entry.Interactable, entry.Tooltip, key => ActionRequested?.Invoke(selectedFeatureId, key));
+                if (entry.Choices.Count > 0)
+                {
+                    row.BindChoices(
+                        entry.Choices.Select(choice => choice.Key).ToArray(),
+                        entry.Choices.Select(choice => choice.Label).ToArray(),
+                        entry.Choices.Select(choice => choice.Interactable).ToArray(),
+                        entry.Choices.Select(choice => choice.Tooltip).ToArray(),
+                        key => ActionRequested?.Invoke(selectedFeatureId, key));
+                }
             }
         }
 
@@ -228,7 +238,11 @@ namespace Civic.UI
             }
             if (featureId == CivicFeatureRegistry.Events) return $"발견 {runtime.MetaProgress.DiscoveredEventIds.Count} · {entryCount}개 선택지";
             if (featureId == CivicFeatureRegistry.Wonders) return $"완공 {runtime.MetaProgress.CompletedWonderIds.Count} · {entryCount}개 불가사의";
-            if (featureId == CivicFeatureRegistry.GreatPeople) return $"발견 {runtime.MetaProgress.DiscoveredPersonIds.Count} · {entryCount}개 인물 항목";
+            if (featureId == CivicFeatureRegistry.GreatPeople)
+            {
+                var people = runtime.GetModule<CivicPeopleModule>(featureId);
+                return $"영입 {people.ActivePeople.Count}/{people.ActiveSlotLimit} · 직책 배치 {people.AssignedPeopleCount}/{people.Positions.Count} · 발견 {runtime.MetaProgress.DiscoveredPersonIds.Count}";
+            }
             return $"{entryCount}개 항목 · {runtime.Features.EnabledIntegrationIds.Count}개 자동 연계 활성";
         }
 
@@ -397,33 +411,88 @@ namespace Civic.UI
             var module = runtime.GetModule<CivicPeopleModule>(CivicFeatureRegistry.GreatPeople);
             var candidateIds = module.Candidates.ToDictionary(item => item.Definition.Id, StringComparer.Ordinal);
             var activeIds = module.ActivePeople.ToDictionary(item => item.Definition.Id, StringComparer.Ordinal);
-            var result = module.Definitions.Select(item =>
+            var positionSnapshots = module.PositionSnapshots;
+            var result = new List<RowEntry>();
+            foreach (var position in positionSnapshots)
+            {
+                var occupant = position.Occupant;
+                if (occupant == null)
+                {
+                    result.Add(new RowEntry(
+                        string.Empty,
+                        $"{position.Definition.DisplayNameKo} · 공석",
+                        "능력 없음",
+                        false,
+                        position.Definition.DescriptionKo,
+                        JoinSections(position.Definition.DescriptionKo, "배치된 위인이 없어 직책 효과가 적용되지 않습니다.")));
+                    continue;
+                }
+
+                var effectLines = module.TraitsFor(occupant.Definition.Id, position.Definition.Id)
+                    .Select(effect => FormatEffect(effect.EffectType, effect.TargetId, effect.Amount, effect.Duration))
+                    .ToArray();
+                var abilityLines = module.AbilitiesFor(occupant.Definition.Id)
+                    .Select(effect => $"{effect.Id}: {FormatEffect(effect.EffectType, effect.TargetId, effect.Amount, effect.Duration)} · {effect.UsesPerRun}회/런")
+                    .ToArray();
+                var abilityTooltip = JoinSections(
+                    $"{position.Definition.DisplayNameKo}에 배치된 {occupant.Definition.DisplayNameKo}의 능동 능력",
+                    JoinInline(abilityLines, "능동 능력 없음"),
+                    $"남은 사용 횟수 {occupant.AbilityUsesRemaining}");
+                result.Add(new RowEntry(
+                    "ability:" + occupant.Definition.Id,
+                    $"{position.Definition.DisplayNameKo} · {occupant.Definition.DisplayNameKo} · 임기 {occupant.TenureRemaining:0}s",
+                    "능력 발동",
+                    occupant.AbilityUsesRemaining > 0 && abilityLines.Length > 0,
+                    abilityTooltip,
+                    JoinSections(position.Definition.DescriptionKo, "현재 직책 효과: " + JoinInline(effectLines, "효과 없음"))));
+            }
+
+            result.AddRange(module.Definitions.Select(item =>
             {
                 var candidate = candidateIds.TryGetValue(item.Id, out var candidateState);
                 var active = activeIds.TryGetValue(item.Id, out var activeState);
                 var retired = module.RetiredIds.Contains(item.Id);
-                var state = active ? $"활성 · {activeState.AssignmentId} · 임기 {activeState.TenureRemaining:0}s"
+                var currentPosition = active && !string.IsNullOrEmpty(activeState.AssignmentId)
+                    ? module.Positions.FirstOrDefault(position => position.Id == activeState.AssignmentId)
+                    : null;
+                var state = active ? $"영입 · {(currentPosition == null ? "미배치" : currentPosition.DisplayNameKo)} · 임기 {activeState.TenureRemaining:0}s"
                     : candidate ? $"후보 · {candidateState.RemainingSeconds:0}s"
                     : retired ? "은퇴" : "미발견";
                 var conditions = FormatConditions(module.ConditionStatusFor(item.Id));
-                var traits = string.Join("\n", module.TraitsFor(item.Id).Select(effect => FormatEffect(effect.EffectType, effect.TargetId, effect.Amount * (active ? module.AssignmentScaleFor(item.Id) : 1d), effect.Duration)));
+                var positionEffects = module.Positions.Select(position =>
+                    $"{position.DisplayNameKo}: {JoinInline(module.TraitsFor(item.Id, position.Id).Select(effect => FormatEffect(effect.EffectType, effect.TargetId, effect.Amount, effect.Duration)), "효과 없음")}").ToArray();
                 var abilities = string.Join("\n", module.AbilitiesFor(item.Id).Select(effect => $"{effect.Id}: {FormatEffect(effect.EffectType, effect.TargetId, effect.Amount, effect.Duration)} · {effect.UsesPerRun}회/런"));
                 var tooltip = JoinSections(
                     $"희귀도 {item.Rarity} · 직군 {item.ArchetypeId} · 기본 임기 {item.BaseTenure:0}s",
                     "발견 조건\n" + conditions,
-                    "특성 효과\n" + traits,
+                    "직책별 효과\n" + string.Join("\n", positionEffects),
                     "능동 능력\n" + abilities,
-                    "허용 배치: " + string.Join(" / ", item.AllowedAssignments),
-                    active ? $"현재 배치 {activeState.AssignmentId} · 적용 배율 {module.AssignmentScaleFor(item.Id):P0}" : string.Empty,
-                    $"활성 슬롯 {module.ActivePeople.Count}/{CivicPeopleModule.ActiveSlotLimit} · 같은 배치 중복 시 100%/70%/50% 배율");
+                    active ? $"현재 직책 {(currentPosition == null ? "미배치" : currentPosition.DisplayNameKo)}" : string.Empty,
+                    $"영입 슬롯 {module.ActivePeople.Count}/{module.ActiveSlotLimit} · 직책은 각 1명만 배치 가능");
                 var description = JoinSections(
                     PersonArchetypeDescription(item.ArchetypeId),
-                    "상시 특성: " + JoinInline(module.TraitsFor(item.Id).Select(effect => FormatEffect(effect.EffectType, effect.TargetId, effect.Amount * (active ? module.AssignmentScaleFor(item.Id) : 1d), effect.Duration)), "없음"),
-                    "능동 능력: " + JoinInline(module.AbilitiesFor(item.Id).Select(effect => FormatEffect(effect.EffectType, effect.TargetId, effect.Amount, effect.Duration)), "없음"));
-                return new RowEntry(candidate ? "recruit:" + item.Id : "", $"{item.DisplayNameKo} · {state}", candidate ? "영입" : "상태", candidate && module.ActivePeople.Count < CivicPeopleModule.ActiveSlotLimit, tooltip, description);
-            }).ToList();
-            result.AddRange(module.ActivePeople.Select(item => new RowEntry("ability:" + item.Definition.Id, $"활성 {item.Definition.DisplayNameKo} · {item.AssignmentId} · 임기 {item.TenureRemaining:0}s", "능력", item.AbilityUsesRemaining > 0, "남은 능력 사용 " + item.AbilityUsesRemaining, "능동 능력은 상시 특성과 별개로 즉시 자원을 지급하거나 정해진 기간 동안 추가 효과를 적용합니다.")));
-            result.AddRange(module.ActivePeople.Select(item => new RowEntry("assign:" + item.Definition.Id, $"배치 {item.Definition.DisplayNameKo} · 현재 {item.AssignmentId}", "배치 변경", item.Definition.AllowedAssignments.Count > 1, string.Join(" / ", item.Definition.AllowedAssignments), "배치는 현재 같은 배치에 모인 인원 수에 따라 상시 특성 배율을 100% / 70% / 50%로 조정합니다.")));
+                    active ? $"현재 상태: {(currentPosition == null ? "미배치 · 효과 없음" : currentPosition.DisplayNameKo + " 효과 적용 중")}" : "영입 후 직책에 배치해야 효과와 능력을 사용할 수 있습니다.",
+                    "직책 버튼에 마우스를 올리면 해당 직책 효과와 교체 결과를 확인할 수 있습니다.");
+                var choices = active
+                    ? module.Positions.Where(position => item.AllowedPositionIds.Contains(position.Id)).Select(position =>
+                    {
+                        var occupant = positionSnapshots.First(snapshot => snapshot.Definition.Id == position.Id).Occupant;
+                        var occupiedText = occupant == null || occupant.Definition.Id == item.Id ? string.Empty : $"현재 {occupant.Definition.DisplayNameKo} 배치 · 선택 시 기존 인물은 미배치됩니다.\n";
+                        var effects = JoinInline(module.TraitsFor(item.Id, position.Id).Select(effect => FormatEffect(effect.EffectType, effect.TargetId, effect.Amount, effect.Duration)), "효과 없음");
+                        return new RowChoice(
+                            $"assign:{item.Id}:{position.Id}",
+                            PositionShortName(position.Id),
+                            activeState.AssignmentId != position.Id,
+                            occupiedText + $"{position.DisplayNameKo} 배치 효과\n{effects}");
+                    }).ToArray()
+                    : Array.Empty<RowChoice>();
+                var key = candidate ? "recruit:" + item.Id
+                    : active && currentPosition != null ? "unassign:" + item.Id
+                    : string.Empty;
+                var action = candidate ? "영입" : active && currentPosition != null ? "직책 해제" : active ? "미배치" : "상태";
+                var interactable = candidate ? module.ActivePeople.Count < module.ActiveSlotLimit : active && currentPosition != null;
+                return new RowEntry(key, $"{item.DisplayNameKo} · {state}", action, interactable, tooltip, description, choices);
+            }));
             if (module.ProvisionalEffectCount > 0) result.Add(new RowEntry("", $"위인 임시 매핑 효과 {module.ProvisionalEffectCount}개", "초기값", false, "특성·능력은 P04 초기 수치·기간·상한으로 적용됩니다."));
             if (result.Count == 0) result.Add(new RowEntry("", "현재 후보나 활성 위인이 없습니다.", "대기", false, string.Empty));
             return result;
@@ -532,11 +601,23 @@ namespace Civic.UI
             }
         }
 
+        private static string PositionShortName(string positionId)
+        {
+            switch (positionId)
+            {
+                case "leader": return "지도자";
+                case "security": return "안보";
+                case "science": return "과학";
+                case "society_economy": return "사회경제";
+                default: return positionId;
+            }
+        }
+
         private readonly struct RowEntry
         {
-            public RowEntry(string key, string info, string action, bool interactable, string tooltip, string description = "")
+            public RowEntry(string key, string info, string action, bool interactable, string tooltip, string description = "", IReadOnlyList<RowChoice> choices = null)
             {
-                Key = key; Info = info; Action = action; Interactable = interactable; Tooltip = tooltip; Description = description;
+                Key = key; Info = info; Action = action; Interactable = interactable; Tooltip = tooltip; Description = description; Choices = choices ?? Array.Empty<RowChoice>();
             }
             public string Key { get; }
             public string Info { get; }
@@ -544,6 +625,23 @@ namespace Civic.UI
             public bool Interactable { get; }
             public string Tooltip { get; }
             public string Description { get; }
+            public IReadOnlyList<RowChoice> Choices { get; }
+        }
+
+        private readonly struct RowChoice
+        {
+            public RowChoice(string key, string label, bool interactable, string tooltip)
+            {
+                Key = key;
+                Label = label;
+                Interactable = interactable;
+                Tooltip = tooltip;
+            }
+
+            public string Key { get; }
+            public string Label { get; }
+            public bool Interactable { get; }
+            public string Tooltip { get; }
         }
     }
 }

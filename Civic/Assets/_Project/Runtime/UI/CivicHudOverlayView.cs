@@ -33,6 +33,11 @@ namespace Civic.UI
         [SerializeField] private Button debugActionButton;
         [SerializeField] private Text debugActionLabel;
         [SerializeField] private Button debugCloseButton;
+        [SerializeField] private Button debugGrantResourcesButton;
+        [SerializeField] private Button debugResearchAllButton;
+        [SerializeField] private Button debugGrantPrestigeButton;
+        [SerializeField] private Toggle debugInstantActionsToggle;
+        [SerializeField] private Text debugInstantActionsLabel;
         [SerializeField] private CivicTooltipView tooltipView;
 
         private string currentEventId = string.Empty;
@@ -51,6 +56,10 @@ namespace Civic.UI
         public event Action DebugDomainChanged;
         public event Action DebugActionRequested;
         public event Action DebugCloseRequested;
+        public event Action DebugGrantResourcesRequested;
+        public event Action DebugResearchAllRequested;
+        public event Action DebugGrantPrestigeRequested;
+        public event Action<bool> DebugInstantActionsChanged;
 
         public bool HasRequiredReferences =>
             exitPopupRoot != null && continueButton != null && mainMenuButton != null &&
@@ -61,7 +70,9 @@ namespace Civic.UI
             eventChoiceButtons.All(item => item != null) && eventChoiceLabels.All(item => item != null) && eventChoiceTooltips.All(item => item != null) &&
             debugPanelRoot != null && debugPreviousDomainButton != null && debugNextDomainButton != null && debugDomainLabel != null &&
             debugPreviousTargetButton != null && debugNextTargetButton != null && debugTargetLabel != null && debugDescriptionLabel != null &&
-            debugActionButton != null && debugActionLabel != null && debugCloseButton != null && tooltipView != null;
+            debugActionButton != null && debugActionLabel != null && debugCloseButton != null &&
+            debugGrantResourcesButton != null && debugResearchAllButton != null && debugGrantPrestigeButton != null &&
+            debugInstantActionsToggle != null && debugInstantActionsLabel != null && tooltipView != null;
 
         public bool IsExitPopupOpen => exitPopupRoot != null && exitPopupRoot.activeSelf;
         public bool IsEventPopupOpen => eventPopupRoot != null && eventPopupRoot.activeSelf;
@@ -73,6 +84,11 @@ namespace Civic.UI
         public Button MainMenuButton => mainMenuButton;
         public Button EventAlertButton => eventAlertButton;
         public IReadOnlyList<Button> EventChoiceButtons => eventChoiceButtons ?? Array.Empty<Button>();
+        public Button DebugGrantResourcesButton => debugGrantResourcesButton;
+        public Button DebugResearchAllButton => debugResearchAllButton;
+        public Button DebugGrantPrestigeButton => debugGrantPrestigeButton;
+        public Toggle DebugInstantActionsToggle => debugInstantActionsToggle;
+        public Text DebugDescriptionLabel => debugDescriptionLabel;
         public string SelectedDebugDomainId => SelectedId(debugDomainIds, debugDomainIndex);
         public string SelectedDebugTargetId => SelectedId(debugTargetIds, debugTargetIndex);
 
@@ -89,6 +105,10 @@ namespace Civic.UI
             debugNextTargetButton.onClick.AddListener(SelectNextDebugTarget);
             debugActionButton.onClick.AddListener(NotifyDebugAction);
             debugCloseButton.onClick.AddListener(NotifyDebugClose);
+            debugGrantResourcesButton.onClick.AddListener(NotifyDebugGrantResources);
+            debugResearchAllButton.onClick.AddListener(NotifyDebugResearchAll);
+            debugGrantPrestigeButton.onClick.AddListener(NotifyDebugGrantPrestige);
+            debugInstantActionsToggle.onValueChanged.AddListener(NotifyDebugInstantActionsChanged);
             for (var index = 0; index < eventChoiceButtons.Length; index++)
             {
                 var captured = index;
@@ -109,6 +129,10 @@ namespace Civic.UI
             debugNextTargetButton?.onClick.RemoveListener(SelectNextDebugTarget);
             debugActionButton?.onClick.RemoveListener(NotifyDebugAction);
             debugCloseButton?.onClick.RemoveListener(NotifyDebugClose);
+            debugGrantResourcesButton?.onClick.RemoveListener(NotifyDebugGrantResources);
+            debugResearchAllButton?.onClick.RemoveListener(NotifyDebugResearchAll);
+            debugGrantPrestigeButton?.onClick.RemoveListener(NotifyDebugGrantPrestige);
+            debugInstantActionsToggle?.onValueChanged.RemoveListener(NotifyDebugInstantActionsChanged);
             for (var index = 0; index < eventChoiceButtons?.Length; index++) eventChoiceButtons[index]?.onClick.RemoveAllListeners();
         }
 
@@ -180,6 +204,11 @@ namespace Civic.UI
             debugPanelRoot.SetActive(true);
         }
 
+        public void SetDebugInstantActions(bool enabled)
+        {
+            debugInstantActionsToggle?.SetIsOnWithoutNotify(enabled);
+        }
+
         public void HideDebugPanel()
         {
             tooltipView?.Hide();
@@ -232,5 +261,9 @@ namespace Civic.UI
         }
         private void NotifyDebugAction() => DebugActionRequested?.Invoke();
         private void NotifyDebugClose() => DebugCloseRequested?.Invoke();
+        private void NotifyDebugGrantResources() => DebugGrantResourcesRequested?.Invoke();
+        private void NotifyDebugResearchAll() => DebugResearchAllRequested?.Invoke();
+        private void NotifyDebugGrantPrestige() => DebugGrantPrestigeRequested?.Invoke();
+        private void NotifyDebugInstantActionsChanged(bool enabled) => DebugInstantActionsChanged?.Invoke(enabled);
     }
 }

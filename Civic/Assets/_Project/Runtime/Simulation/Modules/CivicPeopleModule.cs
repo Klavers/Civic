@@ -33,10 +33,21 @@ namespace Civic.Simulation.Modules
         public int AbilityUsesRemaining { get; }
     }
 
+    public sealed class CivicPersonPositionSnapshot
+    {
+        public CivicPersonPositionSnapshot(CivicPersonPositionDefinition definition, CivicActivePersonSnapshot occupant)
+        {
+            Definition = definition;
+            Occupant = occupant;
+        }
+
+        public CivicPersonPositionDefinition Definition { get; }
+        public CivicActivePersonSnapshot Occupant { get; }
+    }
+
     public sealed class CivicPeopleModule : CivicGameplayModuleBase
     {
         private const int CandidateLimit = 3;
-        public const int ActiveSlotLimit = 3;
         private const double CandidateLifetime = 120d;
         private const double RetiredLegacyRatio = 0.10d;
 
@@ -56,6 +67,10 @@ namespace Civic.Simulation.Modules
         }
 
         public override string FeatureId => CivicFeatureRegistry.GreatPeople;
+        public IReadOnlyList<CivicPersonPositionDefinition> Positions => content.Positions
+            .Where(position => position.RequiredFeatureIds.All(Context.IsFeatureEnabled))
+            .OrderBy(position => position.Order)
+            .ToArray();
         public IReadOnlyList<CivicPersonDefinition> Definitions => content.People;
         public IReadOnlyList<CivicPersonCandidateSnapshot> Candidates => candidateRemaining
             .Select(pair => new CivicPersonCandidateSnapshot(Person(pair.Key), pair.Value)).ToArray();
@@ -66,12 +81,22 @@ namespace Civic.Simulation.Modules
                 pair.Value,
                 RemainingAbilityUses(pair.Key)))
             .ToArray();
+        public IReadOnlyList<CivicPersonPositionSnapshot> PositionSnapshots => Positions
+            .Select(position => new CivicPersonPositionSnapshot(
+                position,
+                ActivePeople.FirstOrDefault(person => person.AssignmentId == position.Id)))
+            .ToArray();
+        public int ActiveSlotLimit => Positions.Count;
+        public int AssignedPeopleCount => assignments.Count(pair => !string.IsNullOrEmpty(pair.Value));
         public IReadOnlyCollection<string> RetiredIds => retiredIds;
         public IReadOnlyList<object> InactiveEffects => inactiveEffects;
         public int ProvisionalEffectCount => content.Traits.Count(item => item.EffectType == CivicProvisionalEffect.Planned) + content.Abilities.Count(item => item.EffectType == CivicProvisionalEffect.Planned);
 
         public IReadOnlyList<CivicPersonConditionDefinition> ConditionsFor(string personId) => content.Conditions.Where(item => item.PersonId == personId).ToArray();
         public IReadOnlyList<CivicPersonEffectDefinition> TraitsFor(string personId) => content.Traits.Where(item => item.PersonId == personId).ToArray();
+        public IReadOnlyList<CivicPersonEffectDefinition> TraitsFor(string personId, string positionId) => content.Traits
+            .Where(item => item.PersonId == personId && item.PositionId == positionId)
+            .ToArray();
         public IReadOnlyList<CivicPersonAbilityDefinition> AbilitiesFor(string personId) => content.Abilities.Where(item => item.PersonId == personId).ToArray();
         public IReadOnlyList<CivicMetricConditionSnapshot> ConditionStatusFor(string personId) => ConditionsFor(personId)
             .Select(condition =>
@@ -87,9 +112,7 @@ namespace Civic.Simulation.Modules
 
         public double AssignmentScaleFor(string personId)
         {
-            if (!assignments.TryGetValue(personId, out var assignment)) return 1d;
-            var order = assignments.Where(pair => pair.Value == assignment).OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Key).ToList().IndexOf(personId) + 1;
-            return order <= 1 ? 1d : order == 2 ? 0.70d : 0.50d;
+            return assignments.TryGetValue(personId, out var positionId) && !string.IsNullOrEmpty(positionId) ? 1d : 0d;
         }
 
         public bool DebugOfferCandidate(string personId)
@@ -145,7 +168,7 @@ namespace Civic.Simulation.Modules
             var person = Person(personId);
             candidateRemaining.Remove(personId);
             tenureRemaining[personId] = person.BaseTenure;
-            assignments[personId] = person.AllowedAssignments[0];
+            assignments[personId] = string.Empty;
             var ability = content.Abilities.FirstOrDefault(item => item.PersonId == personId);
             abilityUses[personId] = ability?.UsesPerRun ?? 0;
             if (!Context.MetaProgress.DiscoveredPersonIds.Contains(personId)) Context.MetaProgress.DiscoveredPersonIds.Add(personId);
@@ -154,19 +177,33 @@ namespace Civic.Simulation.Modules
             return true;
         }
 
-        public bool TryAssign(string personId, string assignmentId)
+        public bool TryAssign(string personId, string positionId)
         {
             if (!tenureRemaining.ContainsKey(personId)) return false;
             var person = Person(personId);
-            if (!person.AllowedAssignments.Contains(assignmentId)) return false;
-            assignments[personId] = assignmentId;
+            if (!person.AllowedPositionIds.Contains(positionId) || Positions.All(position => position.Id != positionId)) return false;
+            var previousOccupant = assignments.FirstOrDefault(pair => pair.Key != personId && pair.Value == positionId).Key;
+            if (!string.IsNullOrEmpty(previousOccupant)) assignments[previousOccupant] = string.Empty;
+            assignments[personId] = positionId;
             RebuildTraitModifiers();
+            PublishMetrics();
+            return true;
+        }
+
+        public bool TryUnassign(string personId)
+        {
+            if (!assignments.TryGetValue(personId, out var positionId) || string.IsNullOrEmpty(positionId)) return false;
+            assignments[personId] = string.Empty;
+            RebuildTraitModifiers();
+            PublishMetrics();
             return true;
         }
 
         public bool TryUseAbility(string personId)
         {
-            if (!tenureRemaining.ContainsKey(personId) || RemainingAbilityUses(personId) <= 0) return false;
+            if (!tenureRemaining.ContainsKey(personId) ||
+                !assignments.TryGetValue(personId, out var positionId) || string.IsNullOrEmpty(positionId) ||
+                RemainingAbilityUses(personId) <= 0) return false;
             var ability = content.Abilities.FirstOrDefault(item => item.PersonId == personId);
             if (ability == null) return false;
             abilityUses[personId]--;
@@ -229,16 +266,14 @@ namespace Civic.Simulation.Modules
                 Context.Modifiers.RemoveSource("person", personId);
             }
 
-            var assignmentCounts = new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (var personId in tenureRemaining.Keys.OrderBy(id => id, StringComparer.Ordinal))
             {
-                var assignment = assignments[personId];
-                assignmentCounts[assignment] = assignmentCounts.TryGetValue(assignment, out var count) ? count + 1 : 1;
-                var scale = assignmentCounts[assignment] == 1 ? 1d : assignmentCounts[assignment] == 2 ? 0.70d : 0.50d;
-                foreach (var trait in content.Traits.Where(item => item.PersonId == personId))
+                var positionId = assignments[personId];
+                if (string.IsNullOrEmpty(positionId)) continue;
+                foreach (var trait in TraitsFor(personId, positionId))
                 {
                     var resolved = trait.Resolve();
-                    Context.Modifiers.Add(new CivicModifierEntry("person", personId, resolved.EffectType, resolved.TargetId, resolved.Amount * scale, resolved.CapGroup));
+                    Context.Modifiers.Add(new CivicModifierEntry("person", personId, resolved.EffectType, resolved.TargetId, resolved.Amount, resolved.CapGroup));
                 }
             }
 
@@ -247,11 +282,12 @@ namespace Civic.Simulation.Modules
 
         private void Retire(string personId)
         {
+            var lastPositionId = assignments.TryGetValue(personId, out var positionId) ? positionId : string.Empty;
             tenureRemaining.Remove(personId);
             assignments.Remove(personId);
             Context.Modifiers.RemoveSource("person", personId);
             retiredIds.Add(personId);
-            foreach (var trait in content.Traits.Where(item => item.PersonId == personId))
+            foreach (var trait in TraitsFor(personId, lastPositionId))
             {
                 var resolved = trait.Resolve();
                 var legacyRatio = RetiredLegacyRatio * Context.Modifiers.Multiplier(CivicModifierEffectTypes.PersonLegacyMultiplier, personId, "*");
@@ -281,7 +317,9 @@ namespace Civic.Simulation.Modules
         {
             Context.Telemetry.SetExternalMetric("person.retiredCount", retiredIds.Count);
             Context.Telemetry.SetExternalMetric("person.activeCount", tenureRemaining.Count);
-            Context.Telemetry.SetExternalMetric("person.sameAssignmentPair", assignments.Values.GroupBy(item => item, StringComparer.Ordinal).Any(group => group.Count() >= 2) ? 1d : 0d);
+            Context.Telemetry.SetExternalMetric("person.assignedCount", AssignedPeopleCount);
+            foreach (var position in Positions) Context.Telemetry.SetExternalMetric("person.positionOccupied." + position.Id, assignments.Values.Contains(position.Id) ? 1d : 0d);
+            Context.Telemetry.SetExternalMetric("person.sameAssignmentPair", 0d);
             Context.Telemetry.SetExternalMetric("person.engineerRetirementRemaining", tenureRemaining.Where(pair => Person(pair.Key).ArchetypeId == "engineer").Select(pair => pair.Value).DefaultIfEmpty(double.MaxValue).Min());
         }
     }

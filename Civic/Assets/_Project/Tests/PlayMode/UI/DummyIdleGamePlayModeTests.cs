@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Collections;
 using Civic.Simulation;
+using Civic.Simulation.Modules;
 using Civic.Features;
 using NUnit.Framework;
 using UnityEngine;
@@ -14,6 +15,7 @@ namespace Civic.UI.Tests
         [SetUp]
         public void SetUp()
         {
+            CivicMetaSession.ResetForTests();
             CivicFeatureRuntime.ResetForMainMenu();
         }
 
@@ -191,6 +193,34 @@ namespace Civic.UI.Tests
             controller.OverlayView.ContinueButton.onClick.Invoke();
             yield return null;
             Assert.That(controller.OverlayView.IsExitPopupOpen, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator CivicHud_DebugQuickCommandsAndInstantToggleWorkInIsolation()
+        {
+            CivicFeatureRuntime.ConfigureAndBeginForTests(CivicFeatureRegistry.Features.Select(item => item.Id));
+            SceneManager.LoadScene("SampleScene");
+            yield return null;
+            yield return null;
+
+            var controller = Object.FindFirstObjectByType<CivicHudController>();
+            Assert.That(controller, Is.Not.Null);
+            controller.ToggleDebugPanel();
+            yield return null;
+
+            var wheatBeforeDebugGrant = controller.Simulation.State.Resources["wheat"];
+            var prestigeBeforeDebugGrant = controller.ModuleRuntime.MetaProgress.PrestigePoints;
+            controller.OverlayView.DebugGrantResourcesButton.onClick.Invoke();
+            controller.OverlayView.DebugResearchAllButton.onClick.Invoke();
+            controller.OverlayView.DebugGrantPrestigeButton.onClick.Invoke();
+            controller.OverlayView.DebugInstantActionsToggle.isOn = true;
+            yield return null;
+
+            Assert.That(controller.Simulation.State.Resources["wheat"], Is.EqualTo(wheatBeforeDebugGrant + CivicNumber.FromDouble(9999d)));
+            Assert.That(controller.Simulation.State.ResearchedTechnologyIds.Count, Is.EqualTo(controller.Simulation.Data.Technologies.Count));
+            Assert.That(controller.ModuleRuntime.MetaProgress.PrestigePoints, Is.EqualTo(prestigeBeforeDebugGrant + 9999));
+            Assert.That(controller.ModuleRuntime.GetModule<CivicPoliticsModule>(CivicFeatureRegistry.Politics).DebugInstantActionsEnabled, Is.True);
+            Assert.That(controller.ModuleRuntime.GetModule<CivicWonderModule>(CivicFeatureRegistry.Wonders).DebugInstantActionsEnabled, Is.True);
         }
 
         [UnityTest]

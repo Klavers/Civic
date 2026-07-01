@@ -1079,6 +1079,36 @@ namespace Civic.Simulation
             RefreshSnapshot();
         }
 
+        public int DebugGrantUnlockedResources(CivicNumber amount)
+        {
+            var granted = 0;
+            foreach (var resource in Data.Resources)
+            {
+                if (resource.Category == ResourceCategory.Aggregate || !IsResourceUnlocked(resource)) continue;
+                if (resource.Id == PopulationId) State.BasePopulation = CivicNumber.ClampMinZero(State.BasePopulation + amount);
+                else SetResource(resource.Id, CivicNumber.ClampMinZero(GetResource(resource.Id) + amount));
+                granted++;
+            }
+
+            RefreshSnapshot();
+            return granted;
+        }
+
+        public int DebugResearchAllTechnologies()
+        {
+            var researched = 0;
+            foreach (var technology in Data.Technologies)
+            {
+                if (!State.ResearchedTechnologyIds.Add(technology.Id)) continue;
+                State.TaxRate += CalculateTaxRateAdd(technology.Id);
+                AdvanceEraForResearchedTechnology(technology);
+                researched++;
+            }
+
+            RefreshSnapshot();
+            return researched;
+        }
+
         public CivicGameSnapshot RefreshSnapshot()
         {
             lastSnapshot = CalculateSnapshot();

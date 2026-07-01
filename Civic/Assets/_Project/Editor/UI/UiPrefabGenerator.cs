@@ -907,33 +907,63 @@ namespace Civic.Editor.UI
                 eventChoiceTooltips[index] = trigger;
             }
 
-            var debugPanel = CreateModalPanel(root.transform, "DebugPanel", new Vector2(760f, 500f));
+            var debugPanel = CreateModalPanel(root.transform, "DebugPanel", new Vector2(980f, 720f));
+            DestroyChildIfExists(debugPanel.transform, "DescriptionLabel");
             var debugTitle = GetOrCreateText(debugPanel.transform, "TitleLabel");
             debugTitle.text = "DEBUG · Backquote(`)";
             debugTitle.fontSize = 28;
             debugTitle.alignment = TextAnchor.MiddleLeft;
             SetRect(debugTitle.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(28f, -48f), new Vector2(-120f, 56f));
-            var debugCloseButton = CreateModalButton(debugPanel.transform, "CloseButton", "닫기", new Vector2(320f, 210f), new Vector2(100f, 44f));
-            var previousDomain = CreateModalButton(debugPanel.transform, "PreviousDomainButton", "◀", new Vector2(-285f, 125f), new Vector2(56f, 48f));
-            var nextDomain = CreateModalButton(debugPanel.transform, "NextDomainButton", "▶", new Vector2(285f, 125f), new Vector2(56f, 48f));
+            var debugCloseButton = CreateModalButton(debugPanel.transform, "CloseButton", "닫기", new Vector2(430f, 320f), new Vector2(100f, 44f));
+
+            var debugGrantResourcesButton = CreateModalButton(debugPanel.transform, "GrantResourcesButton", "해금 자원 +9999", new Vector2(-310f, 235f), new Vector2(280f, 52f));
+            var debugResearchAllButton = CreateModalButton(debugPanel.transform, "ResearchAllButton", "모든 기술 연구", new Vector2(0f, 235f), new Vector2(280f, 52f));
+            var debugGrantPrestigeButton = CreateModalButton(debugPanel.transform, "GrantPrestigeButton", "환생 포인트 +9999", new Vector2(310f, 235f), new Vector2(280f, 52f));
+
+            var instantRow = GetOrCreateChild(debugPanel.transform, "InstantActionsRow", typeof(RectTransform));
+            SetRect(instantRow.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 172f), new Vector2(900f, 44f));
+            var instantToggleObject = GetOrCreateChild(instantRow.transform, "Toggle", typeof(RectTransform), typeof(Image), typeof(Toggle));
+            SetRect(instantToggleObject.GetComponent<RectTransform>(), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(20f, 0f), new Vector2(30f, 30f));
+            var instantToggleImage = instantToggleObject.GetComponent<Image>();
+            instantToggleImage.color = new Color(0.16f, 0.24f, 0.34f, 1f);
+            var instantCheckmark = GetOrCreateChild(instantToggleObject.transform, "Checkmark", typeof(RectTransform), typeof(Image));
+            SetStretchRect(instantCheckmark.GetComponent<RectTransform>(), 5f, 5f, 5f, 5f);
+            var instantCheckmarkImage = instantCheckmark.GetComponent<Image>();
+            instantCheckmarkImage.color = new Color(0.45f, 0.78f, 0.95f, 1f);
+            var instantToggle = instantToggleObject.GetComponent<Toggle>();
+            instantToggle.targetGraphic = instantToggleImage;
+            instantToggle.graphic = instantCheckmarkImage;
+            var instantLabel = GetOrCreateText(instantRow.transform, "Label");
+            instantLabel.text = "사회구조/체계 · 국가 · 불가사의 즉시 적용/완공";
+            instantLabel.fontSize = 17;
+            instantLabel.alignment = TextAnchor.MiddleLeft;
+            SetStretchRect(instantLabel.rectTransform, 48f, 0f, 8f, 0f);
+
+            var previousDomain = CreateModalButton(debugPanel.transform, "PreviousDomainButton", "◀", new Vector2(-390f, 102f), new Vector2(56f, 48f));
+            var nextDomain = CreateModalButton(debugPanel.transform, "NextDomainButton", "▶", new Vector2(390f, 102f), new Vector2(56f, 48f));
             var domainLabel = GetOrCreateText(debugPanel.transform, "DomainLabel");
             domainLabel.text = "모듈";
             domainLabel.fontSize = 22;
             domainLabel.alignment = TextAnchor.MiddleCenter;
-            SetRect(domainLabel.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 125f), new Vector2(500f, 48f));
-            var previousTarget = CreateModalButton(debugPanel.transform, "PreviousTargetButton", "◀", new Vector2(-285f, 55f), new Vector2(56f, 48f));
-            var nextTarget = CreateModalButton(debugPanel.transform, "NextTargetButton", "▶", new Vector2(285f, 55f), new Vector2(56f, 48f));
+            SetRect(domainLabel.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 102f), new Vector2(700f, 48f));
+            var previousTarget = CreateModalButton(debugPanel.transform, "PreviousTargetButton", "◀", new Vector2(-390f, 38f), new Vector2(56f, 48f));
+            var nextTarget = CreateModalButton(debugPanel.transform, "NextTargetButton", "▶", new Vector2(390f, 38f), new Vector2(56f, 48f));
             var targetLabel = GetOrCreateText(debugPanel.transform, "TargetLabel");
             targetLabel.text = "대상";
             targetLabel.fontSize = 20;
             targetLabel.alignment = TextAnchor.MiddleCenter;
-            SetRect(targetLabel.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 55f), new Vector2(500f, 48f));
-            var debugDescription = GetOrCreateText(debugPanel.transform, "DescriptionLabel");
+            SetRect(targetLabel.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 38f), new Vector2(700f, 48f));
+            var debugDescriptionBox = GetOrCreateChild(debugPanel.transform, "DescriptionBox", typeof(RectTransform), typeof(Image));
+            SetRect(debugDescriptionBox.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -85f), new Vector2(900f, 150f));
+            debugDescriptionBox.GetComponent<Image>().color = new Color(0.075f, 0.105f, 0.145f, 1f);
+            var debugDescription = GetOrCreateText(debugDescriptionBox.transform, "DescriptionLabel");
             debugDescription.text = "활성 모듈의 테스트 상태를 강제로 준비합니다.";
             debugDescription.fontSize = 17;
             debugDescription.alignment = TextAnchor.UpperLeft;
-            SetRect(debugDescription.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0.5f), new Vector2(48f, 92f), new Vector2(-96f, -32f));
-            var debugActionButton = CreateModalButton(debugPanel.transform, "ActionButton", "실행", new Vector2(0f, -190f), new Vector2(300f, 58f));
+            debugDescription.horizontalOverflow = HorizontalWrapMode.Wrap;
+            debugDescription.verticalOverflow = VerticalWrapMode.Truncate;
+            SetStretchRect(debugDescription.rectTransform, 18f, 14f, 18f, 14f);
+            var debugActionButton = CreateModalButton(debugPanel.transform, "ActionButton", "실행", new Vector2(0f, -285f), new Vector2(360f, 58f));
             var debugActionLabel = debugActionButton.transform.Find("Label").GetComponent<Text>();
 
             var view = GetOrAdd<CivicHudOverlayView>(root);
@@ -962,6 +992,11 @@ namespace Civic.Editor.UI
             serialized.FindProperty("debugActionButton").objectReferenceValue = debugActionButton;
             serialized.FindProperty("debugActionLabel").objectReferenceValue = debugActionLabel;
             serialized.FindProperty("debugCloseButton").objectReferenceValue = debugCloseButton;
+            serialized.FindProperty("debugGrantResourcesButton").objectReferenceValue = debugGrantResourcesButton;
+            serialized.FindProperty("debugResearchAllButton").objectReferenceValue = debugResearchAllButton;
+            serialized.FindProperty("debugGrantPrestigeButton").objectReferenceValue = debugGrantPrestigeButton;
+            serialized.FindProperty("debugInstantActionsToggle").objectReferenceValue = instantToggle;
+            serialized.FindProperty("debugInstantActionsLabel").objectReferenceValue = instantLabel;
             serialized.FindProperty("tooltipView").objectReferenceValue = tooltipView;
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
@@ -1081,7 +1116,8 @@ namespace Civic.Editor.UI
                 definition.Id == CivicFeatureRegistry.Politics ||
                 definition.Id == CivicFeatureRegistry.Wonders ||
                 definition.Id == CivicFeatureRegistry.GreatPeople;
-            var rowStride = usesDescriptionCards ? 160f : 72f;
+            var usesPersonChoices = definition.Id == CivicFeatureRegistry.GreatPeople;
+            var rowStride = usesPersonChoices ? 208f : usesDescriptionCards ? 160f : 72f;
             var controlsTopOffset = categoryTabRoot != null || impossibleFilterRoot != null ? 150f : 92f;
             var scroll = CreateScrollArea(root.transform, "DomainScroll", rowCount * rowStride, controlsTopOffset);
             var rows = new CivicModuleActionRow[rowCount];
@@ -1095,13 +1131,13 @@ namespace Civic.Editor.UI
             for (var index = 0; index < rowCount; index++)
             {
                 var row = GetOrCreateChild(scroll.Content, $"DomainActionRow{index + 1:00}", typeof(RectTransform), typeof(Image));
-                SetTopStretchRect(row.GetComponent<RectTransform>(), 0f, index * rowStride, 0f, usesDescriptionCards ? 152f : 64f);
+                SetTopStretchRect(row.GetComponent<RectTransform>(), 0f, index * rowStride, 0f, usesPersonChoices ? 200f : usesDescriptionCards ? 152f : 64f);
                 row.GetComponent<Image>().color = new Color(0.035f, 0.055f, 0.08f, 1f);
                 var info = GetOrCreateText(row.transform, "InfoLabel");
                 info.text = definition.DisplayName + " 항목";
                 info.fontSize = 16;
                 info.alignment = TextAnchor.MiddleLeft;
-                SetStretchRect(info.rectTransform, 14f, 6f, 200f, usesDescriptionCards ? 94f : 6f);
+                SetStretchRect(info.rectTransform, 14f, 6f, 200f, usesPersonChoices ? 142f : usesDescriptionCards ? 94f : 6f);
                 var action = GetOrCreateButton(row.transform, "ActionButton");
                 SetRect(
                     action.GetComponent<RectTransform>(),
@@ -1128,6 +1164,37 @@ namespace Civic.Editor.UI
                 descriptionLabel.verticalOverflow = VerticalWrapMode.Truncate;
                 SetStretchRect(descriptionLabel.rectTransform, 12f, 7f, 12f, 7f);
                 descriptionRoot.SetActive(usesDescriptionCards);
+
+                GameObject choiceRoot = null;
+                var choiceButtons = Array.Empty<Button>();
+                var choiceLabels = Array.Empty<Text>();
+                var choiceTooltips = Array.Empty<CivicTooltipTrigger>();
+                if (usesPersonChoices)
+                {
+                    const int choiceCount = 4;
+                    choiceRoot = GetOrCreateChild(row.transform, "PositionChoices", typeof(RectTransform));
+                    SetRect(choiceRoot.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 24f), new Vector2(-16f, 40f));
+                    choiceButtons = new Button[choiceCount];
+                    choiceLabels = new Text[choiceCount];
+                    choiceTooltips = new CivicTooltipTrigger[choiceCount];
+                    for (var choiceIndex = 0; choiceIndex < choiceCount; choiceIndex++)
+                    {
+                        var choice = GetOrCreateButton(choiceRoot.transform, $"PositionButton{choiceIndex + 1:00}");
+                        SetRect(choice.GetComponent<RectTransform>(), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(114f + choiceIndex * 230f, 0f), new Vector2(220f, 36f));
+                        choice.GetComponent<Image>().color = new Color(0.18f, 0.29f, 0.42f, 1f);
+                        var choiceLabel = GetOrCreateText(choice.transform, "Label");
+                        choiceLabel.text = "직책";
+                        choiceLabel.fontSize = 13;
+                        choiceLabel.alignment = TextAnchor.MiddleCenter;
+                        SetRect(choiceLabel.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+                        var choiceTooltip = GetOrAdd<CivicTooltipTrigger>(choice.gameObject);
+                        choiceTooltip.AssignTooltipView(tooltipView);
+                        choiceButtons[choiceIndex] = choice;
+                        choiceLabels[choiceIndex] = choiceLabel;
+                        choiceTooltips[choiceIndex] = choiceTooltip;
+                    }
+                    choiceRoot.SetActive(false);
+                }
                 var component = GetOrAdd<CivicModuleActionRow>(row);
                 var serializedRow = new SerializedObject(component);
                 serializedRow.FindProperty("infoLabel").objectReferenceValue = info;
@@ -1136,6 +1203,10 @@ namespace Civic.Editor.UI
                 serializedRow.FindProperty("actionButton").objectReferenceValue = action;
                 serializedRow.FindProperty("actionLabel").objectReferenceValue = actionLabel;
                 serializedRow.FindProperty("tooltip").objectReferenceValue = tooltip;
+                serializedRow.FindProperty("choiceRoot").objectReferenceValue = choiceRoot;
+                AssignObjectArray(serializedRow, "choiceButtons", choiceButtons);
+                AssignObjectArray(serializedRow, "choiceLabels", choiceLabels);
+                AssignObjectArray(serializedRow, "choiceTooltips", choiceTooltips);
                 serializedRow.ApplyModifiedPropertiesWithoutUndo();
                 rows[index] = component;
             }

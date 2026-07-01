@@ -49,6 +49,7 @@ namespace Civic.Simulation.Modules
         public double PoliticalCapital { get; private set; }
         public double FatigueRemaining { get; private set; }
         public CivicReformSnapshot Reform { get; private set; }
+        public bool DebugInstantActionsEnabled { get; private set; }
 
         public IReadOnlyList<CivicInstitutionUnlockDefinition> UnlocksFor(string institutionId) => content.Unlocks.Where(item => item.InstitutionId == institutionId).ToArray();
         public IReadOnlyList<CivicInstitutionEffectDefinition> EffectsFor(string institutionId) => content.Effects.Where(item => item.InstitutionId == institutionId).ToArray();
@@ -76,6 +77,19 @@ namespace Civic.Simulation.Modules
             Context.Simulation.RefreshSnapshot();
             PublishMetrics();
             return true;
+        }
+
+        public void SetDebugInstantActions(bool enabled)
+        {
+            DebugInstantActionsEnabled = enabled;
+        }
+
+        public bool DebugApplyImmediately(string institutionId)
+        {
+            var previous = DebugInstantActionsEnabled;
+            DebugInstantActionsEnabled = true;
+            try { return TryPropose(institutionId); }
+            finally { DebugInstantActionsEnabled = previous; }
         }
 
         public override void Initialize(CivicModuleContext context)
@@ -124,6 +138,14 @@ namespace Civic.Simulation.Modules
 
         public bool TryPropose(string institutionId)
         {
+            if (DebugInstantActionsEnabled)
+            {
+                if (!DebugUnlockAndFund(institutionId)) return false;
+                targetInstitutionId = string.Empty;
+                reformProgress = 0d;
+                Reform = null;
+                FatigueRemaining = 0d;
+            }
             if (!string.IsNullOrEmpty(targetInstitutionId) || FatigueRemaining > 0d || !IsUnlocked(institutionId)) return false;
             var institution = content.Institutions.First(item => item.Id == institutionId);
             if (activeByCategory.TryGetValue(institution.Category, out var current) && current == institutionId) return false;
@@ -136,6 +158,11 @@ namespace Civic.Simulation.Modules
             targetInstitutionId = institutionId;
             reformProgress = 0d;
             Reform = new CivicReformSnapshot(institutionId, 0d, Support, Resistance(), false);
+            if (DebugInstantActionsEnabled)
+            {
+                CompleteReform(institution);
+                FatigueRemaining = 0d;
+            }
             return true;
         }
 

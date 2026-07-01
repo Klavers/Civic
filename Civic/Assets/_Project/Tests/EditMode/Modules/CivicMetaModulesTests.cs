@@ -119,9 +119,13 @@ namespace Civic.Simulation.Modules.Tests
         {
             var content = CivicPeopleContentLoader.LoadFromResources();
 
+            Assert.That(content.Positions.Count, Is.EqualTo(4));
+            Assert.That(content.Positions.Select(item => item.Id), Is.EquivalentTo(new[] { "leader", "security", "science", "society_economy" }));
             Assert.That(content.People.Count, Is.EqualTo(15));
             Assert.That(content.People.Select(item => item.Id), Is.Unique);
             Assert.That(content.People.All(item => item.BaseTenure >= 600d && item.BaseTenure <= 1800d), Is.True);
+            Assert.That(content.People.All(person => person.AllowedPositionIds.Count == 4), Is.True);
+            Assert.That(content.People.All(person => person.AllowedPositionIds.All(positionId => content.Traits.Any(trait => trait.PersonId == person.Id && trait.PositionId == positionId))), Is.True);
         }
 
         [Test]
@@ -311,6 +315,28 @@ namespace Civic.Simulation.Modules.Tests
         }
 
         [Test]
+        public void NationModule_DebugInstantFormationBypassesConditionsCostAndPreparation()
+        {
+            const string nations = "id,displayNameKo,conceptId,tier,preparationSeconds,treasuryCost,secret,requiredFeatureIds,descriptionKo\n" +
+                "locked_nation,잠긴 국가,test,1,999,99999,false,,시험 국가\n";
+            const string conditions = "nationId,metricId,comparator,value,alternativeGroup\n" +
+                "locked_nation,snapshot.population,>=,999999,\n";
+            const string effects = "nationId,charterId,effectType,targetId,amount,capGroup\n" +
+                "locked_nation,default,resourceOutputMultiplier,wheat,0.1,resource_output\n";
+            var content = CivicNationContentLoader.Parse(nations, conditions, effects);
+            var simulation = new CivicGameSimulation(gameData);
+            var runtime = new CivicModuleRuntime(
+                simulation,
+                CivicFeatureResolver.Resolve(new[] { CivicFeatureRegistry.NationFormation }),
+                nationContent: content);
+            var module = runtime.GetModule<CivicNationModule>(CivicFeatureRegistry.NationFormation);
+
+            Assert.That(module.DebugFormImmediately("locked_nation"), Is.True);
+            Assert.That(module.CurrentNationId, Is.EqualTo("locked_nation"));
+            Assert.That(simulation.Modifiers.Entries.Any(item => item.SourceType == "nation" && item.SourceId == "locked_nation"), Is.True);
+        }
+
+        [Test]
         public void NationModule_MarksMismatchedStartingCivilizationAsImpossibleThisRun()
         {
             CivicRunLaunchSettings.StartingCivilizationId = "arpadel";
@@ -358,6 +384,31 @@ namespace Civic.Simulation.Modules.Tests
             Assert.That(module.ActiveByCategory["government"], Is.EqualTo("alternate_rule"));
             Assert.That(simulation.Modifiers.Entries.Any(item => item.SourceType == "institution" && item.SourceId == "alternate_rule" && Math.Abs(item.Amount - 0.25d) < 1e-9d), Is.True);
             Assert.That(simulation.Modifiers.Entries.Any(item => item.SourceId == "default_rule"), Is.False);
+        }
+
+        [Test]
+        public void PoliticsModule_DebugInstantApplyBypassesUnlockCostAndDuration()
+        {
+            const string institutions = "id,category,displayNameKo,descriptionKo,order,isDefault,politicalCost,treasuryCost,reformSeconds,fatigueSeconds\n" +
+                "default_rule,government,default,default,0,true,0,0,1,0\n" +
+                "locked_rule,government,locked,locked,1,false,50,50,600,600\n";
+            const string unlocks = "institutionId,metricId,comparator,value,alternativeGroup\n" +
+                "locked_rule,snapshot.population,>=,999999,\n";
+            const string effects = "institutionId,effectType,targetId,amount,costType,capGroup\n" +
+                "locked_rule,resourceOutputMultiplier,wheat,0.25,,resource_output\n";
+            var content = CivicPoliticsContentLoader.Parse(institutions, unlocks, effects);
+            var simulation = new CivicGameSimulation(gameData);
+            var runtime = new CivicModuleRuntime(
+                simulation,
+                CivicFeatureResolver.Resolve(new[] { CivicFeatureRegistry.Politics }),
+                politicsContent: content);
+            var module = runtime.GetModule<CivicPoliticsModule>(CivicFeatureRegistry.Politics);
+
+            Assert.That(module.IsUnlocked("locked_rule"), Is.False);
+            Assert.That(module.DebugApplyImmediately("locked_rule"), Is.True);
+            Assert.That(module.ActiveByCategory["government"], Is.EqualTo("locked_rule"));
+            Assert.That(module.Reform, Is.Null);
+            Assert.That(module.FatigueRemaining, Is.Zero);
         }
 
         [Test]
@@ -480,16 +531,45 @@ namespace Civic.Simulation.Modules.Tests
         }
 
         [Test]
+        public void WonderModule_DebugInstantCompleteBypassesConditionsAndConstruction()
+        {
+            const string wonders = "id,displayNameKo,conceptId,eraId,technologyId,upfrontTreasury,upkeepType,upkeepAmount,requiredFeatureIds\n" +
+                "locked_wonder,잠긴 불가사의,test,future,future_taxation,99999,none,0,\n";
+            const string costs = "wonderId,resourceId,amount,deliveryRate\n" +
+                "locked_wonder,wheat,99999,0.01\n";
+            const string conditions = "wonderId,metricId,comparator,value\n" +
+                "locked_wonder,snapshot.population,>=,999999\n";
+            const string effects = "wonderId,effectType,targetId,amount,duration,capGroup\n" +
+                "locked_wonder,resourceOutputMultiplier,wheat,0.1,0,resource_output\n";
+            var content = CivicWonderContentLoader.Parse(wonders, costs, conditions, effects);
+            var simulation = new CivicGameSimulation(gameData);
+            var runtime = new CivicModuleRuntime(
+                simulation,
+                CivicFeatureResolver.Resolve(new[] { CivicFeatureRegistry.Wonders }),
+                wonderContent: content);
+            var module = runtime.GetModule<CivicWonderModule>(CivicFeatureRegistry.Wonders);
+
+            Assert.That(module.DebugCompleteImmediately("locked_wonder"), Is.True);
+            Assert.That(module.CompletedIds, Contains.Item("locked_wonder"));
+            Assert.That(module.ActiveProjectId, Is.Empty);
+            Assert.That(simulation.Modifiers.Entries.Any(item => item.SourceType == "wonder" && item.SourceId == "locked_wonder"), Is.True);
+        }
+
+        [Test]
         public void PeopleModule_RecruitsUsesAbilityAndLeavesReducedLegacy()
         {
-            const string people = "id,displayNameKo,archetypeId,rarity,portraitId,baseTenure,allowedAssignments,requiredFeatureIds\n" +
-                "test_person,시험 인물,scholar,common,test,600,research,\n";
+            const string positions = "id,displayNameKo,descriptionKo,order,requiredFeatureIds\n" +
+                "leader,국가지도자,국가 전반을 담당합니다.,0,\n" +
+                "science,과학연구담당관,과학과 기술 연구를 담당합니다.,1,\n";
+            const string people = "id,displayNameKo,archetypeId,rarity,portraitId,baseTenure,allowedPositionIds,requiredFeatureIds\n" +
+                "test_person,시험 인물,scholar,common,test,600,leader;science,\n";
             const string conditions = "personId,metricId,comparator,value\n";
-            const string traits = "personId,effectType,targetId,amount,capGroup\n" +
-                "test_person,resourceOutputMultiplier,wheat,0.1,resource_output\n";
+            const string traits = "personId,positionId,effectType,targetId,amount,capGroup\n" +
+                "test_person,leader,resourceOutputMultiplier,wheat,0.2,resource_output\n" +
+                "test_person,science,resourceOutputMultiplier,wheat,0.1,resource_output\n";
             const string abilities = "personId,id,effectType,targetId,amount,duration,usesPerRun\n" +
                 "test_person,grant_wheat,resourceGrant,wheat,2,0,1\n";
-            var content = CivicPeopleContentLoader.Parse(people, conditions, traits, abilities);
+            var content = CivicPeopleContentLoader.Parse(positions, people, conditions, traits, abilities);
             var simulation = new CivicGameSimulation(gameData);
             var runtime = new CivicModuleRuntime(
                 simulation,
@@ -500,11 +580,52 @@ namespace Civic.Simulation.Modules.Tests
 
             Assert.That(module.Candidates.Count, Is.EqualTo(1));
             Assert.That(module.TryRecruit("test_person"), Is.True);
+            Assert.That(simulation.Modifiers.Entries.Any(item => item.SourceType == "person"), Is.False);
+            Assert.That(module.TryUseAbility("test_person"), Is.False);
+            Assert.That(module.TryAssign("test_person", "science"), Is.True);
+            Assert.That(simulation.Modifiers.Entries.Any(item => item.SourceType == "person" && Math.Abs(item.Amount - 0.1d) < 1e-9d), Is.True);
             Assert.That(module.TryUseAbility("test_person"), Is.True);
             Assert.That(simulation.State.Resources["wheat"], Is.EqualTo(wheatBefore + CivicNumber.FromDouble(2d)));
+            Assert.That(module.TryUnassign("test_person"), Is.True);
+            Assert.That(simulation.Modifiers.Entries.Any(item => item.SourceType == "person"), Is.False);
+            Assert.That(module.TryAssign("test_person", "leader"), Is.True);
             runtime.Advance(600d);
             Assert.That(module.RetiredIds, Contains.Item("test_person"));
-            Assert.That(simulation.Modifiers.Entries.Any(item => item.SourceType == "personLegacy" && Math.Abs(item.Amount - 0.01d) < 1e-9d), Is.True);
+            Assert.That(simulation.Modifiers.Entries.Any(item => item.SourceType == "personLegacy" && Math.Abs(item.Amount - 0.02d) < 1e-9d), Is.True);
+        }
+
+        [Test]
+        public void PeopleModule_AssigningOccupiedPositionMovesPreviousPersonToUnassigned()
+        {
+            const string positions = "id,displayNameKo,descriptionKo,order,requiredFeatureIds\n" +
+                "leader,국가지도자,국가 전반을 담당합니다.,0,\n" +
+                "science,과학연구담당관,과학과 기술 연구를 담당합니다.,1,\n";
+            const string people = "id,displayNameKo,archetypeId,rarity,portraitId,baseTenure,allowedPositionIds,requiredFeatureIds\n" +
+                "person_a,인물 A,scholar,common,a,600,leader;science,\n" +
+                "person_b,인물 B,scholar,common,b,600,leader;science,\n";
+            const string conditions = "personId,metricId,comparator,value\n";
+            const string traits = "personId,positionId,effectType,targetId,amount,capGroup\n" +
+                "person_a,leader,resourceOutputMultiplier,wheat,0.1,resource_output\n" +
+                "person_a,science,resourceOutputMultiplier,wheat,0.01,resource_output\n" +
+                "person_b,leader,resourceOutputMultiplier,wheat,0.2,resource_output\n" +
+                "person_b,science,resourceOutputMultiplier,wheat,0.02,resource_output\n";
+            const string abilities = "personId,id,effectType,targetId,amount,duration,usesPerRun\n";
+            var content = CivicPeopleContentLoader.Parse(positions, people, conditions, traits, abilities);
+            var simulation = new CivicGameSimulation(gameData);
+            var runtime = new CivicModuleRuntime(
+                simulation,
+                CivicFeatureResolver.Resolve(new[] { CivicFeatureRegistry.GreatPeople }),
+                peopleContent: content);
+            var module = runtime.GetModule<CivicPeopleModule>(CivicFeatureRegistry.GreatPeople);
+
+            Assert.That(module.TryRecruit("person_a"), Is.True);
+            Assert.That(module.TryRecruit("person_b"), Is.True);
+            Assert.That(module.TryAssign("person_a", "leader"), Is.True);
+            Assert.That(module.TryAssign("person_b", "leader"), Is.True);
+            Assert.That(module.ActivePeople.Single(item => item.Definition.Id == "person_a").AssignmentId, Is.Empty);
+            Assert.That(module.PositionSnapshots.Single(item => item.Definition.Id == "leader").Occupant.Definition.Id, Is.EqualTo("person_b"));
+            Assert.That(simulation.Modifiers.Entries.Any(item => item.SourceType == "person" && item.SourceId == "person_a"), Is.False);
+            Assert.That(simulation.Modifiers.Entries.Any(item => item.SourceType == "person" && item.SourceId == "person_b" && Math.Abs(item.Amount - 0.2d) < 1e-9d), Is.True);
         }
     }
 }

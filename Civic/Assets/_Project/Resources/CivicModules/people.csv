@@ -1,16 +1,16 @@
-id,displayNameKo,archetypeId,rarity,portraitId,baseTenure,allowedAssignments,requiredFeatureIds
-liora_ven,리오라 벤,scholar,famous,liora_ven,900,research_previous,
-tarek_on,타렉 온,scholar,famous,tarek_on,900,research_industrial,narrative.events
-mina_sorel,미나 소렐,scholar,legendary,mina_sorel,1200,research_information,narrative.events
-borin_kael,보린 카엘,engineer,famous,borin_kael,900,wonder_canal,projects.wonders
-eda_mar,에다 마르,engineer,famous,eda_mar,900,wonder_railway,projects.wonders;narrative.events
-jin_oro,진 오로,engineer,legendary,jin_oro,1200,wonder_future,projects.wonders
-asha_ren,아샤 렌,politician,famous,asha_ren,900,nation_envoy,identity.nationFormation;narrative.events
-corvin_dal,코르빈 달,politician,famous,corvin_dal,900,reform_franchise,governance.politics
-nera_sol,네라 솔,politician,famous,nera_sol,900,reform_welfare,governance.politics;narrative.events
-selim_baro,셀림 바로,entrepreneur,famous,selim_baro,900,market_goods,narrative.events
-ilia_crest,일리아 크레스트,entrepreneur,famous,ilia_crest,900,factory_specialization,
-mara_kin,마라 킨,entrepreneur,famous,mara_kin,900,treasury_management,progress.achievements;narrative.events
-oren_vale,오렌 베일,culture,famous,oren_vale,900,chronicle,narrative.events;identity.nationFormation
-sia_noren,시아 노렌,culture,famous,sia_noren,900,wonder_exploration,projects.wonders;narrative.events
-doran_pell,도란 펠,culture,famous,doran_pell,900,public_campaign,governance.politics;narrative.events
+id,displayNameKo,archetypeId,rarity,portraitId,baseTenure,allowedPositionIds,requiredFeatureIds
+liora_ven,리오라 벤,scholar,famous,liora_ven,900,leader;security;science;society_economy,
+tarek_on,타렉 온,scholar,famous,tarek_on,900,leader;security;science;society_economy,narrative.events
+mina_sorel,미나 소렐,scholar,legendary,mina_sorel,1200,leader;security;science;society_economy,narrative.events
+borin_kael,보린 카엘,engineer,famous,borin_kael,900,leader;security;science;society_economy,projects.wonders
+eda_mar,에다 마르,engineer,famous,eda_mar,900,leader;security;science;society_economy,projects.wonders;narrative.events
+jin_oro,진 오로,engineer,legendary,jin_oro,1200,leader;security;science;society_economy,projects.wonders
+asha_ren,아샤 렌,politician,famous,asha_ren,900,leader;security;science;society_economy,identity.nationFormation;narrative.events
+corvin_dal,코르빈 달,politician,famous,corvin_dal,900,leader;security;science;society_economy,governance.politics
+nera_sol,네라 솔,politician,famous,nera_sol,900,leader;security;science;society_economy,governance.politics;narrative.events
+selim_baro,셀림 바로,entrepreneur,famous,selim_baro,900,leader;security;science;society_economy,narrative.events
+ilia_crest,일리아 크레스트,entrepreneur,famous,ilia_crest,900,leader;security;science;society_economy,
+mara_kin,마라 킨,entrepreneur,famous,mara_kin,900,leader;security;science;society_economy,progress.achievements;narrative.events
+oren_vale,오렌 베일,culture,famous,oren_vale,900,leader;security;science;society_economy,narrative.events;identity.nationFormation
+sia_noren,시아 노렌,culture,famous,sia_noren,900,leader;security;science;society_economy,projects.wonders;narrative.events
+doran_pell,도란 펠,culture,famous,doran_pell,900,leader;security;science;society_economy,governance.politics;narrative.events

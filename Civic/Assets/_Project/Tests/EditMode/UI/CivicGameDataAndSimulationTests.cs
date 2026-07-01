@@ -126,6 +126,39 @@ namespace Civic.UI.Tests
         }
 
         [Test]
+        public void DebugGrantUnlockedResources_AddsOnlyCurrentlyUnlockedStoredResources()
+        {
+            var data = LoadDefaultData();
+            var simulation = new CivicGameSimulation(data);
+            var locked = data.Resources.First(resource =>
+                resource.Category == ResourceCategory.Element &&
+                !string.IsNullOrEmpty(resource.RequiredTechnologyId) &&
+                !simulation.State.ResearchedTechnologyIds.Contains(resource.RequiredTechnologyId));
+            var wheatBefore = simulation.State.Resources["wheat"];
+            var lockedBefore = simulation.State.Resources[locked.Id];
+
+            var granted = simulation.DebugGrantUnlockedResources(CivicNumber.FromDouble(9999d));
+
+            Assert.That(granted, Is.GreaterThan(0));
+            Assert.That(simulation.State.Resources["wheat"], Is.EqualTo(wheatBefore + CivicNumber.FromDouble(9999d)));
+            Assert.That(simulation.State.Resources[locked.Id], Is.EqualTo(lockedBefore));
+            Assert.That(simulation.Snapshot.Resources.Any(resource => resource.Id == locked.Id), Is.False);
+        }
+
+        [Test]
+        public void DebugResearchAllTechnologies_ResearchesEveryTechnologyAndAdvancesToLatestEra()
+        {
+            var data = LoadDefaultData();
+            var simulation = new CivicGameSimulation(data);
+
+            var researched = simulation.DebugResearchAllTechnologies();
+
+            Assert.That(researched, Is.EqualTo(data.Technologies.Count - data.InitialState.Technologies.Count));
+            Assert.That(simulation.State.ResearchedTechnologyIds, Is.EquivalentTo(data.Technologies.Select(item => item.Id)));
+            Assert.That(simulation.Snapshot.CurrentEraId, Is.EqualTo(data.Eras.OrderByDescending(item => item.Order).First().Id));
+        }
+
+        [Test]
         public void ResearchUnlocksResourcesAndBuildingsForSnapshot()
         {
             var simulation = new CivicGameSimulation(LoadDefaultData());

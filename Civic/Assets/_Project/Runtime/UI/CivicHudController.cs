@@ -24,6 +24,7 @@ namespace Civic.UI
         private string selectedTechnologyEraId;
         private bool prestigeConfirmationPending;
         private string lastAutoOpenedEventId = string.Empty;
+        private bool debugInstantActionsEnabled;
 
         public CivicHudView View => view;
         public CivicGameSimulation Simulation => simulation;
@@ -71,6 +72,10 @@ namespace Civic.UI
             overlayView.DebugDomainChanged += RefreshDebugTargets;
             overlayView.DebugActionRequested += ExecuteDebugAction;
             overlayView.DebugCloseRequested += CloseDebugPanel;
+            overlayView.DebugGrantResourcesRequested += DebugGrantUnlockedResources;
+            overlayView.DebugResearchAllRequested += DebugResearchAllTechnologies;
+            overlayView.DebugGrantPrestigeRequested += DebugGrantPrestigePoints;
+            overlayView.DebugInstantActionsChanged += SetDebugInstantActions;
             Render();
         }
 
@@ -104,6 +109,10 @@ namespace Civic.UI
                 overlayView.DebugDomainChanged -= RefreshDebugTargets;
                 overlayView.DebugActionRequested -= ExecuteDebugAction;
                 overlayView.DebugCloseRequested -= CloseDebugPanel;
+                overlayView.DebugGrantResourcesRequested -= DebugGrantUnlockedResources;
+                overlayView.DebugResearchAllRequested -= DebugResearchAllTechnologies;
+                overlayView.DebugGrantPrestigeRequested -= DebugGrantPrestigePoints;
+                overlayView.DebugInstantActionsChanged -= SetDebugInstantActions;
             }
         }
 
@@ -233,9 +242,10 @@ namespace Civic.UI
                 .Where(item => moduleRuntime != null && moduleRuntime.Modules.ContainsKey(item.Id) &&
                     (item.Id == CivicFeatureRegistry.Events || item.Id == CivicFeatureRegistry.GreatPeople ||
                      item.Id == CivicFeatureRegistry.NationFormation || item.Id == CivicFeatureRegistry.Politics ||
-                     item.Id == CivicFeatureRegistry.StartCivilizations))
+                     item.Id == CivicFeatureRegistry.StartCivilizations || item.Id == CivicFeatureRegistry.Wonders))
                 .ToArray();
             overlayView.ConfigureDebugDomains(domains.Select(item => item.Id).ToArray(), domains.Select(item => item.DisplayName).ToArray());
+            overlayView.SetDebugInstantActions(debugInstantActionsEnabled);
             overlayView.ShowDebugPanel();
             RefreshDebugTargets();
         }
@@ -259,12 +269,17 @@ namespace Civic.UI
             else if (featureId == CivicFeatureRegistry.NationFormation)
             {
                 var definitions = moduleRuntime.GetModule<CivicNationModule>(featureId)?.Definitions ?? Array.Empty<CivicNationDefinition>();
-                overlayView.ConfigureDebugTargets(definitions.Select(item => item.Id).ToArray(), definitions.Select(item => item.DisplayNameKo).ToArray(), "선택한 국가의 설립 조건을 이번 런에서 강제로 충족 처리합니다.", "조건 충족");
+                overlayView.ConfigureDebugTargets(definitions.Select(item => item.Id).ToArray(), definitions.Select(item => item.DisplayNameKo).ToArray(), debugInstantActionsEnabled ? "선택한 국가를 조건·비용·준비 시간 없이 즉시 설립합니다." : "선택한 국가의 설립 조건을 이번 런에서 강제로 충족 처리합니다.", debugInstantActionsEnabled ? "즉시 설립" : "조건 충족");
             }
             else if (featureId == CivicFeatureRegistry.Politics)
             {
                 var definitions = moduleRuntime.GetModule<CivicPoliticsModule>(featureId)?.Definitions ?? Array.Empty<CivicInstitutionDefinition>();
-                overlayView.ConfigureDebugTargets(definitions.Select(item => item.Id).ToArray(), definitions.Select(item => item.DisplayNameKo).ToArray(), "선택한 체계를 강제 해금하고 개혁 비용을 테스트할 수 있도록 정치력·국고를 지급합니다.", "해금·비용 지급");
+                overlayView.ConfigureDebugTargets(definitions.Select(item => item.Id).ToArray(), definitions.Select(item => item.DisplayNameKo).ToArray(), debugInstantActionsEnabled ? "선택한 사회구조·체계를 비용과 개혁 시간 없이 즉시 적용합니다." : "선택한 체계를 강제 해금하고 개혁 비용을 테스트할 수 있도록 정치력·국고를 지급합니다.", debugInstantActionsEnabled ? "즉시 적용" : "해금·비용 지급");
+            }
+            else if (featureId == CivicFeatureRegistry.Wonders)
+            {
+                var definitions = moduleRuntime.GetModule<CivicWonderModule>(featureId)?.Definitions ?? Array.Empty<CivicWonderDefinition>();
+                overlayView.ConfigureDebugTargets(definitions.Select(item => item.Id).ToArray(), definitions.Select(item => item.DisplayNameKo).ToArray(), debugInstantActionsEnabled ? "선택한 불가사의를 조건·비용·건축 시간 없이 즉시 완공하고 효과를 적용합니다." : "선택한 불가사의의 조건을 해제하고 필요한 국고·자원을 지급해 정상 건축을 테스트할 수 있게 합니다.", debugInstantActionsEnabled ? "즉시 완공" : "건축 준비");
             }
             else if (featureId == CivicFeatureRegistry.StartCivilizations)
             {
@@ -285,14 +300,60 @@ namespace Civic.UI
             if (string.IsNullOrEmpty(targetId)) return;
             if (featureId == CivicFeatureRegistry.Events) moduleRuntime.GetModule<CivicEventModule>(featureId)?.DebugQueueEvent(targetId);
             else if (featureId == CivicFeatureRegistry.GreatPeople) moduleRuntime.GetModule<CivicPeopleModule>(featureId)?.DebugOfferCandidate(targetId);
-            else if (featureId == CivicFeatureRegistry.NationFormation) moduleRuntime.GetModule<CivicNationModule>(featureId)?.DebugSatisfyConditions(targetId);
-            else if (featureId == CivicFeatureRegistry.Politics) moduleRuntime.GetModule<CivicPoliticsModule>(featureId)?.DebugUnlockAndFund(targetId);
+            else if (featureId == CivicFeatureRegistry.NationFormation)
+            {
+                var module = moduleRuntime.GetModule<CivicNationModule>(featureId);
+                if (debugInstantActionsEnabled) module?.DebugFormImmediately(targetId);
+                else module?.DebugSatisfyConditions(targetId);
+            }
+            else if (featureId == CivicFeatureRegistry.Politics)
+            {
+                var module = moduleRuntime.GetModule<CivicPoliticsModule>(featureId);
+                if (debugInstantActionsEnabled) module?.DebugApplyImmediately(targetId);
+                else module?.DebugUnlockAndFund(targetId);
+            }
+            else if (featureId == CivicFeatureRegistry.Wonders)
+            {
+                var module = moduleRuntime.GetModule<CivicWonderModule>(featureId);
+                if (debugInstantActionsEnabled) module?.DebugCompleteImmediately(targetId);
+                else module?.DebugPrepare(targetId);
+            }
             else if (featureId == CivicFeatureRegistry.StartCivilizations)
             {
                 CivicRunLaunchSettings.StartingCivilizationId = targetId;
                 SceneManager.LoadScene("SampleScene");
                 return;
             }
+            Render();
+        }
+
+        private void DebugGrantUnlockedResources()
+        {
+            simulation?.DebugGrantUnlockedResources(CivicNumber.FromDouble(9999d));
+            Render();
+        }
+
+        private void DebugResearchAllTechnologies()
+        {
+            simulation?.DebugResearchAllTechnologies();
+            Render();
+        }
+
+        private void DebugGrantPrestigePoints()
+        {
+            if (moduleRuntime == null) return;
+            moduleRuntime.MetaProgress.PrestigePoints += 9999;
+            CivicMetaSession.Store.Save(moduleRuntime.MetaProgress);
+            Render();
+        }
+
+        private void SetDebugInstantActions(bool enabled)
+        {
+            debugInstantActionsEnabled = enabled;
+            moduleRuntime?.GetModule<CivicPoliticsModule>(CivicFeatureRegistry.Politics)?.SetDebugInstantActions(enabled);
+            moduleRuntime?.GetModule<CivicNationModule>(CivicFeatureRegistry.NationFormation)?.SetDebugInstantActions(enabled);
+            moduleRuntime?.GetModule<CivicWonderModule>(CivicFeatureRegistry.Wonders)?.SetDebugInstantActions(enabled);
+            RefreshDebugTargets();
             Render();
         }
 
@@ -354,15 +415,10 @@ namespace Civic.UI
                 else if (key.StartsWith("ability:", StringComparison.Ordinal)) module?.TryUseAbility(key.Substring("ability:".Length));
                 else if (key.StartsWith("assign:", StringComparison.Ordinal) && module != null)
                 {
-                    var personId = key.Substring("assign:".Length);
-                    var active = module.ActivePeople.FirstOrDefault(item => item.Definition.Id == personId);
-                    if (active != null)
-                    {
-                        var assignments = active.Definition.AllowedAssignments;
-                        var currentIndex = assignments.ToList().IndexOf(active.AssignmentId);
-                        module.TryAssign(personId, assignments[(currentIndex + 1 + assignments.Count) % assignments.Count]);
-                    }
+                    var parts = key.Split(':');
+                    if (parts.Length == 3) module.TryAssign(parts[1], parts[2]);
                 }
+                else if (key.StartsWith("unassign:", StringComparison.Ordinal)) module?.TryUnassign(key.Substring("unassign:".Length));
             }
 
             Render();
