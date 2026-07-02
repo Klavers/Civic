@@ -25,6 +25,10 @@ namespace Civic.UI
         private string selectedFeatureId;
         private string selectedPoliticsCategory;
         private bool showImpossibleNations;
+        private int selectedPeopleTab;
+        private bool showUnavailablePeople = true;
+        private bool showRecruitablePeople = true;
+        private bool showRecruitedPeople = true;
         private UnityAction[] tabHandlers = Array.Empty<UnityAction>();
 
         public event Action<string, string> ActionRequested;
@@ -44,6 +48,8 @@ namespace Civic.UI
         public bool IsOpen => panelRoot != null && panelRoot.activeSelf;
         public string SelectedFeatureId => selectedFeatureId;
         public string SelectedPoliticsCategory => selectedPoliticsCategory;
+        public int SelectedPeopleTab => selectedPeopleTab;
+        public IReadOnlyList<bool> PeopleFilterValues => new[] { showUnavailablePeople, showRecruitablePeople, showRecruitedPeople };
         public IReadOnlyList<Button> TabButtons => tabButtons ?? Array.Empty<Button>();
         public IReadOnlyList<CivicModuleActionRow> Rows => domainPanels?.SelectMany(item => item.Rows).ToArray() ?? Array.Empty<CivicModuleActionRow>();
         public IReadOnlyList<CivicDomainPanelView> DomainPanels => domainPanels ?? Array.Empty<CivicDomainPanelView>();
@@ -65,6 +71,12 @@ namespace Civic.UI
             if (politicsPanel != null) politicsPanel.CategoryTabRequested += SelectPoliticsCategory;
             var nationPanel = DomainPanel(CivicFeatureRegistry.NationFormation);
             if (nationPanel != null) nationPanel.ImpossibleFilterChanged += SetShowImpossibleNations;
+            var peoplePanel = DomainPanel(CivicFeatureRegistry.GreatPeople);
+            if (peoplePanel != null)
+            {
+                peoplePanel.CategoryTabRequested += SelectPeopleTab;
+                peoplePanel.FilterChanged += SetPeopleFilter;
+            }
         }
 
         private void OnDisable()
@@ -79,6 +91,12 @@ namespace Civic.UI
             if (politicsPanel != null) politicsPanel.CategoryTabRequested -= SelectPoliticsCategory;
             var nationPanel = DomainPanel(CivicFeatureRegistry.NationFormation);
             if (nationPanel != null) nationPanel.ImpossibleFilterChanged -= SetShowImpossibleNations;
+            var peoplePanel = DomainPanel(CivicFeatureRegistry.GreatPeople);
+            if (peoplePanel != null)
+            {
+                peoplePanel.CategoryTabRequested -= SelectPeopleTab;
+                peoplePanel.FilterChanged -= SetPeopleFilter;
+            }
             tooltipView?.Hide();
         }
 
@@ -156,15 +174,12 @@ namespace Civic.UI
                 var entry = entries[index];
                 var row = domainPanel.Rows[index];
                 row.Bind(entry.Key, entry.Info, entry.Description, entry.Action, entry.Interactable, entry.Tooltip, key => ActionRequested?.Invoke(selectedFeatureId, key));
-                if (entry.Choices.Count > 0)
-                {
-                    row.BindChoices(
-                        entry.Choices.Select(choice => choice.Key).ToArray(),
-                        entry.Choices.Select(choice => choice.Label).ToArray(),
-                        entry.Choices.Select(choice => choice.Interactable).ToArray(),
-                        entry.Choices.Select(choice => choice.Tooltip).ToArray(),
-                        key => ActionRequested?.Invoke(selectedFeatureId, key));
-                }
+                row.BindChoices(
+                    entry.Choices.Select(choice => choice.Key).ToArray(),
+                    entry.Choices.Select(choice => choice.Label).ToArray(),
+                    entry.Choices.Select(choice => choice.Interactable).ToArray(),
+                    entry.Choices.Select(choice => choice.Tooltip).ToArray(),
+                    key => ActionRequested?.Invoke(selectedFeatureId, key));
             }
         }
 
@@ -199,6 +214,10 @@ namespace Civic.UI
                 }).ToArray();
                 panel.ConfigureCategoryTabs(labels, Array.IndexOf(categories, selectedPoliticsCategory));
             }
+            else if (featureId == CivicFeatureRegistry.GreatPeople)
+            {
+                panel.ConfigureCategoryTabs(new[] { "직책 슬롯", "위인 영입" }, selectedPeopleTab);
+            }
             else
             {
                 panel.ConfigureCategoryTabs(Array.Empty<string>(), -1);
@@ -208,6 +227,13 @@ namespace Civic.UI
                 featureId == CivicFeatureRegistry.NationFormation,
                 showImpossibleNations,
                 "달성불가 조건의 문명·국가도 표시");
+            panel.ConfigureFilters(
+                featureId == CivicFeatureRegistry.GreatPeople && selectedPeopleTab == 1
+                    ? new[] { "영입 불가능", "영입 가능", "영입됨" }
+                    : Array.Empty<string>(),
+                featureId == CivicFeatureRegistry.GreatPeople && selectedPeopleTab == 1
+                    ? new[] { showUnavailablePeople, showRecruitablePeople, showRecruitedPeople }
+                    : Array.Empty<bool>());
         }
 
         private void SelectPoliticsCategory(int index)
@@ -224,6 +250,27 @@ namespace Civic.UI
         {
             tooltipView?.Hide();
             showImpossibleNations = value;
+            RenderSelected();
+        }
+
+        private void SelectPeopleTab(int index)
+        {
+            if (index < 0 || index > 1) return;
+            tooltipView?.Hide();
+            selectedPeopleTab = index;
+            RenderSelected();
+        }
+
+        private void SetPeopleFilter(int index, bool value)
+        {
+            tooltipView?.Hide();
+            switch (index)
+            {
+                case 0: showUnavailablePeople = value; break;
+                case 1: showRecruitablePeople = value; break;
+                case 2: showRecruitedPeople = value; break;
+                default: return;
+            }
             RenderSelected();
         }
 
@@ -409,11 +456,13 @@ namespace Civic.UI
         private List<RowEntry> PeopleEntries()
         {
             var module = runtime.GetModule<CivicPeopleModule>(CivicFeatureRegistry.GreatPeople);
-            var candidateIds = module.Candidates.ToDictionary(item => item.Definition.Id, StringComparer.Ordinal);
-            var activeIds = module.ActivePeople.ToDictionary(item => item.Definition.Id, StringComparer.Ordinal);
-            var positionSnapshots = module.PositionSnapshots;
+            return selectedPeopleTab == 0 ? PeoplePositionEntries(module) : PeopleRecruitmentEntries(module);
+        }
+
+        private List<RowEntry> PeoplePositionEntries(CivicPeopleModule module)
+        {
             var result = new List<RowEntry>();
-            foreach (var position in positionSnapshots)
+            foreach (var position in module.PositionSnapshots)
             {
                 var occupant = position.Occupant;
                 if (occupant == null)
@@ -423,7 +472,7 @@ namespace Civic.UI
                         $"{position.Definition.DisplayNameKo} · 공석",
                         "능력 없음",
                         false,
-                        position.Definition.DescriptionKo,
+                        JoinSections(position.Definition.DescriptionKo, "배치된 위인이 없어 능력을 사용할 수 없습니다."),
                         JoinSections(position.Definition.DescriptionKo, "배치된 위인이 없어 직책 효과가 적용되지 않습니다.")));
                     continue;
                 }
@@ -432,11 +481,11 @@ namespace Civic.UI
                     .Select(effect => FormatEffect(effect.EffectType, effect.TargetId, effect.Amount, effect.Duration))
                     .ToArray();
                 var abilityLines = module.AbilitiesFor(occupant.Definition.Id)
-                    .Select(effect => $"{effect.Id}: {FormatEffect(effect.EffectType, effect.TargetId, effect.Amount, effect.Duration)} · {effect.UsesPerRun}회/런")
+                    .Select(FormatPersonAbility)
                     .ToArray();
                 var abilityTooltip = JoinSections(
                     $"{position.Definition.DisplayNameKo}에 배치된 {occupant.Definition.DisplayNameKo}의 능동 능력",
-                    JoinInline(abilityLines, "능동 능력 없음"),
+                    string.Join("\n", abilityLines.DefaultIfEmpty("능동 능력 없음")),
                     $"남은 사용 횟수 {occupant.AbilityUsesRemaining}");
                 result.Add(new RowEntry(
                     "ability:" + occupant.Definition.Id,
@@ -444,10 +493,28 @@ namespace Civic.UI
                     "능력 발동",
                     occupant.AbilityUsesRemaining > 0 && abilityLines.Length > 0,
                     abilityTooltip,
-                    JoinSections(position.Definition.DescriptionKo, "현재 직책 효과: " + JoinInline(effectLines, "효과 없음"))));
+                    JoinSections(
+                        position.Definition.DescriptionKo,
+                        "현재 직책 효과: " + JoinInline(effectLines, "효과 없음"),
+                        "액티브 능력\n" + string.Join("\n", abilityLines.DefaultIfEmpty("능동 능력 없음")),
+                        $"남은 사용 횟수 {occupant.AbilityUsesRemaining}")));
             }
 
-            result.AddRange(module.Definitions.Select(item =>
+            return result;
+        }
+
+        private List<RowEntry> PeopleRecruitmentEntries(CivicPeopleModule module)
+        {
+            var candidateIds = module.Candidates.ToDictionary(item => item.Definition.Id, StringComparer.Ordinal);
+            var activeIds = module.ActivePeople.ToDictionary(item => item.Definition.Id, StringComparer.Ordinal);
+            var positionSnapshots = module.PositionSnapshots;
+            var result = new List<RowEntry>();
+            result.AddRange(module.Definitions.Where(item =>
+            {
+                var candidate = candidateIds.ContainsKey(item.Id);
+                var active = activeIds.ContainsKey(item.Id);
+                return active ? showRecruitedPeople : candidate ? showRecruitablePeople : showUnavailablePeople;
+            }).Select(item =>
             {
                 var candidate = candidateIds.TryGetValue(item.Id, out var candidateState);
                 var active = activeIds.TryGetValue(item.Id, out var activeState);
@@ -461,7 +528,7 @@ namespace Civic.UI
                 var conditions = FormatConditions(module.ConditionStatusFor(item.Id));
                 var positionEffects = module.Positions.Select(position =>
                     $"{position.DisplayNameKo}: {JoinInline(module.TraitsFor(item.Id, position.Id).Select(effect => FormatEffect(effect.EffectType, effect.TargetId, effect.Amount, effect.Duration)), "효과 없음")}").ToArray();
-                var abilities = string.Join("\n", module.AbilitiesFor(item.Id).Select(effect => $"{effect.Id}: {FormatEffect(effect.EffectType, effect.TargetId, effect.Amount, effect.Duration)} · {effect.UsesPerRun}회/런"));
+                var abilities = string.Join("\n", module.AbilitiesFor(item.Id).Select(FormatPersonAbility));
                 var tooltip = JoinSections(
                     $"희귀도 {item.Rarity} · 직군 {item.ArchetypeId} · 기본 임기 {item.BaseTenure:0}s",
                     "발견 조건\n" + conditions,
@@ -493,14 +560,20 @@ namespace Civic.UI
                 var interactable = candidate ? module.ActivePeople.Count < module.ActiveSlotLimit : active && currentPosition != null;
                 return new RowEntry(key, $"{item.DisplayNameKo} · {state}", action, interactable, tooltip, description, choices);
             }));
-            if (module.ProvisionalEffectCount > 0) result.Add(new RowEntry("", $"위인 임시 매핑 효과 {module.ProvisionalEffectCount}개", "초기값", false, "특성·능력은 P04 초기 수치·기간·상한으로 적용됩니다."));
-            if (result.Count == 0) result.Add(new RowEntry("", "현재 후보나 활성 위인이 없습니다.", "대기", false, string.Empty));
+            if (result.Count == 0) result.Add(new RowEntry("", "현재 필터 조건에 표시할 위인이 없습니다.", "대기", false, "영입 탭의 표시 체크박스를 조정하십시오."));
             return result;
         }
 
         private static string FormatAchievementReward(CivicAchievementRewardDefinition reward)
         {
             return FormatEffect(reward.EffectType, reward.TargetId, reward.Amount, 0d);
+        }
+
+        private static string FormatPersonAbility(CivicPersonAbilityDefinition ability)
+        {
+            var resolved = ability.Resolve();
+            var description = string.IsNullOrWhiteSpace(ability.DescriptionKo) ? string.Empty : " · " + ability.DescriptionKo;
+            return $"{ability.DisplayNameKo}{description}\n효과: {FormatEffect(resolved.EffectType, resolved.TargetId, resolved.Amount, resolved.Duration)} · {ability.UsesPerRun}회/런";
         }
 
         private static string FormatConditions(IEnumerable<CivicMetricConditionSnapshot> conditions)

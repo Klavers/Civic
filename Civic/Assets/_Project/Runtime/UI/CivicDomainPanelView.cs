@@ -21,11 +21,17 @@ namespace Civic.UI
         [SerializeField] private GameObject impossibleFilterRoot;
         [SerializeField] private Toggle impossibleFilterToggle;
         [SerializeField] private Text impossibleFilterLabel;
+        [SerializeField] private GameObject filterRoot;
+        [SerializeField] private GameObject[] filterRows;
+        [SerializeField] private Toggle[] filterToggles;
+        [SerializeField] private Text[] filterLabels;
 
         private UnityAction[] categoryTabHandlers = Array.Empty<UnityAction>();
+        private UnityAction<bool>[] filterHandlers = Array.Empty<UnityAction<bool>>();
 
         public event Action<int> CategoryTabRequested;
         public event Action<bool> ImpossibleFilterChanged;
+        public event Action<int, bool> FilterChanged;
 
         public string FeatureId => featureId;
         public GameObject PanelRoot => panelRoot;
@@ -37,10 +43,14 @@ namespace Civic.UI
         public IReadOnlyList<Text> CategoryTabLabels => categoryTabLabels ?? Array.Empty<Text>();
         public GameObject ImpossibleFilterRoot => impossibleFilterRoot;
         public Toggle ImpossibleFilterToggle => impossibleFilterToggle;
+        public GameObject FilterRoot => filterRoot;
+        public IReadOnlyList<GameObject> FilterRows => filterRows ?? Array.Empty<GameObject>();
+        public IReadOnlyList<Toggle> FilterToggles => filterToggles ?? Array.Empty<Toggle>();
+        public IReadOnlyList<Text> FilterLabels => filterLabels ?? Array.Empty<Text>();
         public bool HasRequiredReferences =>
             !string.IsNullOrWhiteSpace(featureId) && panelRoot != null && titleLabel != null && statusLabel != null &&
             rows != null && rows.Length >= 15 && rows.All(row => row != null && row.HasRequiredReferences) &&
-            HasValidCategoryTabReferences() && HasValidImpossibleFilterReferences();
+            HasValidCategoryTabReferences() && HasValidImpossibleFilterReferences() && HasValidFilterReferences();
 
         private void OnEnable()
         {
@@ -56,6 +66,16 @@ namespace Civic.UI
             }
 
             impossibleFilterToggle?.onValueChanged.AddListener(NotifyImpossibleFilterChanged);
+            if (filterToggles != null)
+            {
+                filterHandlers = new UnityAction<bool>[filterToggles.Length];
+                for (var index = 0; index < filterToggles.Length; index++)
+                {
+                    var captured = index;
+                    filterHandlers[index] = value => FilterChanged?.Invoke(captured, value);
+                    filterToggles[index]?.onValueChanged.AddListener(filterHandlers[index]);
+                }
+            }
         }
 
         private void OnDisable()
@@ -66,6 +86,10 @@ namespace Civic.UI
             }
 
             impossibleFilterToggle?.onValueChanged.RemoveListener(NotifyImpossibleFilterChanged);
+            for (var index = 0; index < filterToggles?.Length && index < filterHandlers.Length; index++)
+            {
+                if (filterHandlers[index] != null) filterToggles[index]?.onValueChanged.RemoveListener(filterHandlers[index]);
+            }
         }
 
         public void SetVisible(bool visible)
@@ -96,6 +120,20 @@ namespace Civic.UI
             impossibleFilterToggle.SetIsOnWithoutNotify(value);
         }
 
+        public void ConfigureFilters(IReadOnlyList<string> labels, IReadOnlyList<bool> values)
+        {
+            var count = Math.Min(labels?.Count ?? 0, values?.Count ?? 0);
+            if (filterRoot != null) filterRoot.SetActive(count > 0);
+            for (var index = 0; index < FilterRows.Count; index++)
+            {
+                var visible = index < count;
+                FilterRows[index].SetActive(visible);
+                if (!visible) continue;
+                FilterLabels[index].text = labels[index];
+                FilterToggles[index].SetIsOnWithoutNotify(values[index]);
+            }
+        }
+
         private bool HasValidCategoryTabReferences()
         {
             if (categoryTabRoot == null)
@@ -115,6 +153,20 @@ namespace Civic.UI
             return impossibleFilterRoot == null
                 ? impossibleFilterToggle == null && impossibleFilterLabel == null
                 : impossibleFilterToggle != null && impossibleFilterLabel != null;
+        }
+
+        private bool HasValidFilterReferences()
+        {
+            if (filterRoot == null)
+            {
+                return (filterRows == null || filterRows.Length == 0) &&
+                    (filterToggles == null || filterToggles.Length == 0) &&
+                    (filterLabels == null || filterLabels.Length == 0);
+            }
+
+            return filterRows != null && filterToggles != null && filterLabels != null &&
+                filterRows.Length > 0 && filterRows.Length == filterToggles.Length && filterRows.Length == filterLabels.Length &&
+                filterRows.All(item => item != null) && filterToggles.All(item => item != null) && filterLabels.All(item => item != null);
         }
 
         private void NotifyImpossibleFilterChanged(bool value) => ImpossibleFilterChanged?.Invoke(value);

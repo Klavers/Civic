@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Collections;
 using Civic.Simulation;
@@ -5,8 +6,11 @@ using Civic.Simulation.Modules;
 using Civic.Features;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+using Unity.Profiling;
+using Object = UnityEngine.Object;
 
 namespace Civic.UI.Tests
 {
@@ -17,6 +21,59 @@ namespace Civic.UI.Tests
         {
             CivicMetaSession.ResetForTests();
             CivicFeatureRuntime.ResetForMainMenu();
+        }
+
+        [UnityTest]
+        public IEnumerator CivicHud_ProfileUpdateCostBySubsystem()
+        {
+            CivicFeatureRuntime.ConfigureAndBeginForTests(CivicFeatureRegistry.Features.Select(item => item.Id));
+            using (var update = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "Civic.Hud.Update", 64))
+            using (var advance = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "Civic.Hud.Advance", 64))
+            using (var snapshot = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "Civic.Simulation.CalculateSnapshot", 64))
+            using (var core = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "Civic.Hud.CoreRender", 64))
+            using (var modules = ProfilerRecorder.StartNew(ProfilerCategory.Scripts, "Civic.Hud.ModuleRender", 64))
+            {
+                SceneManager.LoadScene("SampleScene");
+                yield return null;
+                yield return null;
+
+                var controller = Object.FindFirstObjectByType<CivicHudController>();
+                Assert.That(controller, Is.Not.Null);
+                var initialSnapshot = System.Diagnostics.Stopwatch.StartNew();
+                controller.Simulation.RefreshSnapshot();
+                initialSnapshot.Stop();
+                Debug.Log($"CIVIC_HUD_PROFILE_INITIAL_SNAPSHOT elapsed={initialSnapshot.Elapsed.TotalMilliseconds:0.###}ms · researched={controller.Simulation.State.ResearchedTechnologyIds.Count} · resources={controller.Simulation.Snapshot.Resources.Count} · buildings={controller.Simulation.Snapshot.Buildings.Count}");
+                controller.Simulation.DebugResearchAllTechnologies();
+                foreach (var buildingId in controller.Simulation.State.Buildings.Keys.ToArray())
+                {
+                    controller.Simulation.State.Buildings[buildingId] = 100;
+                }
+                var stressSnapshot = System.Diagnostics.Stopwatch.StartNew();
+                controller.Simulation.RefreshSnapshot();
+                stressSnapshot.Stop();
+                Debug.Log($"CIVIC_HUD_PROFILE_STRESS_SNAPSHOT elapsed={stressSnapshot.Elapsed.TotalMilliseconds:0.###}ms · researched={controller.Simulation.State.ResearchedTechnologyIds.Count} · resources={controller.Simulation.Snapshot.Resources.Count} · buildings={controller.Simulation.Snapshot.Buildings.Count}");
+                yield return null;
+
+                var closed = new double[20][];
+                for (var frame = 0; frame < closed.Length; frame++)
+                {
+                    yield return null;
+                    closed[frame] = ProfileFrame(update, advance, snapshot, core, modules);
+                }
+
+                controller.ModulePanelView.OpenPanel();
+                var open = new double[20][];
+                for (var frame = 0; frame < open.Length; frame++)
+                {
+                    yield return null;
+                    open[frame] = ProfileFrame(update, advance, snapshot, core, modules);
+                }
+
+                Debug.Log(ProfileSummary("CIVIC_HUD_PROFILE_CLOSED", closed));
+                Debug.Log(ProfileSummary("CIVIC_HUD_PROFILE_OPEN", open));
+                Assert.That(closed.Any(sample => sample[0] > 0d), Is.True);
+                Assert.That(open.Any(sample => sample[0] > 0d), Is.True);
+            }
         }
 
         [UnityTest]
@@ -181,6 +238,24 @@ namespace Civic.UI.Tests
             yield return null;
             Assert.That(controller.PanelMode, Is.EqualTo(CivicHudPanelMode.None));
 
+            controller.View.NationPanelButton.onClick.Invoke();
+            yield return null;
+            Assert.That(controller.PanelMode, Is.EqualTo(CivicHudPanelMode.Nation));
+            Assert.That(controller.View.NationDetailPanel.activeSelf, Is.True);
+            Assert.That(controller.View.NationStatusLabel.text, Does.StartWith("현재 국가:"));
+            var visibleNationRows = controller.View.NationModifierRows.Where(row => row.activeSelf).ToArray();
+            Assert.That(visibleNationRows, Is.Not.Empty);
+            controller.View.NationModifierExpandButtons[0].onClick.Invoke();
+            yield return null;
+            Assert.That(controller.View.NationModifierDetailRoots[0].activeSelf, Is.True);
+            Assert.That(controller.View.NationModifierDetailLabels[0].text, Does.Contain("\n"));
+            Assert.That(controller.View.NationModifierLayouts[0].preferredHeight, Is.GreaterThan(52f));
+            Assert.That(controller.View.NationModifierRows[0].GetComponent<RectTransform>().rect.height, Is.EqualTo(controller.View.NationModifierLayouts[0].preferredHeight).Within(1f));
+            Assert.That(controller.View.TooltipView.DoesNotBlockRaycasts, Is.True);
+            controller.View.DetailCloseButton.onClick.Invoke();
+            yield return null;
+            Assert.That(controller.PanelMode, Is.EqualTo(CivicHudPanelMode.None));
+
             modulePanel.OpenButton.onClick.Invoke();
             yield return null;
             controller.ProcessEscape();
@@ -267,6 +342,59 @@ namespace Civic.UI.Tests
             Assert.That(nationPanel.Rows.Count(row => row.gameObject.activeSelf), Is.GreaterThan(hiddenImpossibleCount));
             Assert.That(nationPanel.Rows.Where(row => row.gameObject.activeSelf).All(row => row.DescriptionRoot.activeSelf), Is.True);
 
+            var peopleIndex = CivicFeatureRegistry.Features.ToList().FindIndex(item => item.Id == CivicFeatureRegistry.GreatPeople);
+            modulePanel.TabButtons[peopleIndex].onClick.Invoke();
+            yield return null;
+            var peoplePanel = modulePanel.DomainPanels.Single(item => item.FeatureId == CivicFeatureRegistry.GreatPeople);
+            Assert.That(modulePanel.SelectedPeopleTab, Is.Zero);
+            Assert.That(peoplePanel.CategoryTabRows.Count(row => row.activeSelf), Is.EqualTo(2));
+            Assert.That(peoplePanel.Rows.Count(row => row.gameObject.activeSelf), Is.EqualTo(4));
+            Assert.That(peoplePanel.FilterRoot.activeSelf, Is.False);
+
+            peoplePanel.CategoryTabButtons[1].onClick.Invoke();
+            yield return null;
+            Assert.That(modulePanel.SelectedPeopleTab, Is.EqualTo(1));
+            Assert.That(peoplePanel.FilterRoot.activeSelf, Is.True);
+            Assert.That(peoplePanel.FilterToggles.All(toggle => toggle.isOn), Is.True);
+
+            var people = controller.ModuleRuntime.GetModule<CivicPeopleModule>(CivicFeatureRegistry.GreatPeople);
+            var offeredId = people.Definitions.First().Id;
+            var offeredAbilityName = people.AbilitiesFor(offeredId).First().DisplayNameKo;
+            Assert.That(people.DebugOfferCandidate(offeredId), Is.True);
+            yield return new WaitForSeconds(0.25f);
+            var candidateRow = peoplePanel.Rows.First(row => row.gameObject.activeSelf && row.InfoLabel.text.Contains("후보"));
+            candidateRow.ActionButton.onClick.Invoke();
+            yield return null;
+            var recruitedRow = peoplePanel.Rows.First(row => row.gameObject.activeSelf && row.InfoLabel.text.Contains("영입 ·"));
+            Assert.That(recruitedRow.ChoiceTooltips.All(trigger => !string.IsNullOrWhiteSpace(trigger.TooltipText)), Is.True);
+            var pointer = new PointerEventData(EventSystem.current) { position = new Vector2(400f, 400f) };
+            recruitedRow.ChoiceTooltips[0].OnPointerEnter(pointer);
+            Assert.That(controller.View.TooltipView.IsVisible, Is.True);
+            modulePanel.Bind(controller.ModuleRuntime, false);
+            Assert.That(controller.View.TooltipView.IsVisible, Is.True, "매 프레임 재바인딩 중에도 직책 tooltip이 유지되어야 한다.");
+            recruitedRow.ChoiceTooltips[0].OnPointerExit(pointer);
+            recruitedRow.ChoiceButtons[0].onClick.Invoke();
+            yield return null;
+
+            peoplePanel.CategoryTabButtons[0].onClick.Invoke();
+            yield return null;
+            var occupiedPositionRow = peoplePanel.Rows.First(row => row.gameObject.activeSelf && row.InfoLabel.text.Contains("임기"));
+            Assert.That(occupiedPositionRow.ActionTooltip.TooltipText, Is.Not.Empty);
+            Assert.That(occupiedPositionRow.ActionTooltip.TooltipText, Does.Contain(offeredAbilityName));
+            Assert.That(occupiedPositionRow.DescriptionLabel.text, Does.Contain(offeredAbilityName));
+            Assert.That(occupiedPositionRow.DescriptionLabel.text, Does.Contain("액티브 능력"));
+            occupiedPositionRow.ActionTooltip.OnPointerEnter(pointer);
+            Assert.That(controller.View.TooltipView.IsVisible, Is.True);
+            modulePanel.Bind(controller.ModuleRuntime, false);
+            Assert.That(controller.View.TooltipView.IsVisible, Is.True, "능력 발동 tooltip도 재바인딩 중 유지되어야 한다.");
+            occupiedPositionRow.ActionTooltip.OnPointerExit(pointer);
+
+            peoplePanel.CategoryTabButtons[1].onClick.Invoke();
+            yield return null;
+            peoplePanel.FilterToggles[2].isOn = false;
+            yield return null;
+            Assert.That(peoplePanel.Rows.Where(row => row.gameObject.activeSelf).All(row => !row.InfoLabel.text.Contains("영입 ·")), Is.True);
+
             controller.View.TooltipView.Show("tooltip lifecycle", Vector2.zero);
             Assert.That(controller.View.TooltipView.IsVisible, Is.True);
             modulePanel.ClosePanel();
@@ -285,7 +413,7 @@ namespace Civic.UI.Tests
             var controller = Object.FindFirstObjectByType<CivicHudController>();
             var events = controller.ModuleRuntime.GetModule<Civic.Simulation.Modules.CivicEventModule>(CivicFeatureRegistry.Events);
             if (events.Queue.Count == 0) Assert.That(events.DebugQueueEvent(events.Definitions[0].Id), Is.True);
-            yield return null;
+            yield return new WaitForSeconds(0.25f);
 
             Assert.That(controller.OverlayView.EventAlertButton.gameObject.activeSelf, Is.True);
             Assert.That(controller.OverlayView.IsEventPopupOpen, Is.True);
@@ -324,6 +452,18 @@ namespace Civic.UI.Tests
             yield return null;
             yield return null;
             Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("MainMenu"));
+        }
+
+        private static double[] ProfileFrame(params ProfilerRecorder[] recorders)
+        {
+            return recorders.Select(recorder => recorder.LastValue / 1_000_000d).ToArray();
+        }
+
+        private static string ProfileSummary(string prefix, double[][] samples)
+        {
+            var names = new[] { "update", "advance", "snapshot", "coreHud", "moduleHud" };
+            return prefix + " " + string.Join(" | ", names.Select((name, index) =>
+                $"{name}={samples.Average(sample => sample[index]):0.###}ms"));
         }
     }
 }

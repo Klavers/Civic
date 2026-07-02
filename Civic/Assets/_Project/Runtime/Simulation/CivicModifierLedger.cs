@@ -98,6 +98,7 @@ namespace Civic.Simulation
 
         public IReadOnlyList<CivicModifierEntry> Entries => entries;
         public IReadOnlyDictionary<string, CivicModifierCapDefinition> Caps => caps;
+        public int Revision { get; private set; }
 
         public void ConfigureCaps(IEnumerable<CivicModifierCapDefinition> definitions)
         {
@@ -107,16 +108,18 @@ namespace Civic.Simulation
                 if (caps.ContainsKey(definition.Id)) throw new ArgumentException("Duplicate modifier cap: " + definition.Id, nameof(definitions));
                 caps.Add(definition.Id, definition);
             }
+            Revision++;
         }
 
         public void Add(CivicModifierEntry entry)
         {
             entries.Add(entry ?? throw new ArgumentNullException(nameof(entry)));
+            Revision++;
         }
 
         public void ReplaceSource(string sourceType, string sourceId, IEnumerable<CivicModifierEntry> replacements)
         {
-            RemoveSource(sourceType, sourceId);
+            var changed = entries.RemoveAll(entry => entry.SourceType == sourceType && entry.SourceId == sourceId) > 0;
             foreach (var replacement in replacements ?? Array.Empty<CivicModifierEntry>())
             {
                 if (replacement.SourceType != sourceType || replacement.SourceId != sourceId)
@@ -125,12 +128,14 @@ namespace Civic.Simulation
                 }
 
                 entries.Add(replacement);
+                changed = true;
             }
+            if (changed) Revision++;
         }
 
         public void RemoveSource(string sourceType, string sourceId)
         {
-            entries.RemoveAll(entry => entry.SourceType == sourceType && entry.SourceId == sourceId);
+            if (entries.RemoveAll(entry => entry.SourceType == sourceType && entry.SourceId == sourceId) > 0) Revision++;
         }
 
         public double Additive(string effectType, params string[] targetIds)

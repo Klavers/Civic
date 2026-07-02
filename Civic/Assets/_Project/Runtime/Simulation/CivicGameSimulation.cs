@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Profiling;
 
 namespace Civic.Simulation
 {
@@ -42,6 +43,8 @@ namespace Civic.Simulation
 
     public sealed class CivicGameSimulation
     {
+        private static readonly ProfilerMarker CalculateSnapshotProfilerMarker = new ProfilerMarker("Civic.Simulation.CalculateSnapshot");
+
         private const string PopulationId = "population";
         private const string FoodId = "food";
         private const string ScienceId = "science";
@@ -53,6 +56,11 @@ namespace Civic.Simulation
         private double tickAccumulatorSeconds;
         private CivicGameSnapshot lastSnapshot;
         private readonly IReadOnlyDictionary<string, string> technologyEffectSummaries;
+        private int technologyCacheResearchCount = -1;
+        private TechnologyEffectDefinition[] activeTechnologyEffectsCache = Array.Empty<TechnologyEffectDefinition>();
+        private IReadOnlyDictionary<string, TechnologyEffectDefinition[]> activeTechnologyEffectsByBuilding =
+            new Dictionary<string, TechnologyEffectDefinition[]>(StringComparer.Ordinal);
+        private ResourceDefinition[] unlockedPopulationConsumptionResourcesCache = Array.Empty<ResourceDefinition>();
 
         public CivicGameSimulation(CivicGameData data)
         {
@@ -82,7 +90,6 @@ namespace Civic.Simulation
             var wholeTicks = (int)Math.Floor(tickAccumulatorSeconds / TickSeconds);
             if (wholeTicks <= 0)
             {
-                lastSnapshot = CalculateSnapshot();
                 return lastSnapshot;
             }
 
@@ -215,7 +222,7 @@ namespace Civic.Simulation
         {
             var normalDemand = EmptyResourceNumberMap();
             var normalOutput = EmptyResourceNumberMap();
-            var activeEffects = ActiveTechnologyEffects().ToArray();
+            var activeEffects = ActiveTechnologyEffects();
             foreach (var building in ActiveTickBuildings())
             {
                 var count = GetBuildingCount(building);
@@ -404,7 +411,10 @@ namespace Civic.Simulation
 
         private CivicGameSnapshot CalculateSnapshot()
         {
-            return CalculateSnapshot(CalculateRates());
+            using (CalculateSnapshotProfilerMarker.Auto())
+            {
+                return CalculateSnapshot(CalculateRates());
+            }
         }
 
         private CivicGameSnapshot CalculateSnapshot(CivicRateSet rates)
@@ -469,7 +479,7 @@ namespace Civic.Simulation
                 .ToArray();
             var visibleBuildings = Data.Buildings
                 .Where(building => !building.IsBuildable || IsBuildingUnlocked(building))
-                .Select(building => BuildBuildingSnapshot(building, rates.Gdp))
+                .Select(building => BuildBuildingSnapshot(building, rates))
                 .OrderBy(building => Data.BuildingsById[building.Id].SortOrder)
                 .ToArray();
             return new CivicGameSnapshot(
@@ -495,8 +505,9 @@ namespace Civic.Simulation
                     IsBlockedByPopulationLimit(building)));
         }
 
-        private CivicBuildingSnapshot BuildBuildingSnapshot(BuildingDefinition building, CivicNumber currentGdp)
+        private CivicBuildingSnapshot BuildBuildingSnapshot(BuildingDefinition building, CivicRateSet rates)
         {
+            var resourceDeltas = BuildBuildingResourceDeltas(building);
             return new CivicBuildingSnapshot(
                 building.Id,
                 building.DisplayNameKo,
@@ -505,8 +516,8 @@ namespace Civic.Simulation
                 CanBuild(building),
                 GetBuildBlockReason(building),
                 GetEffectiveConstructionCost(building),
-                BuildBuildingResourceDeltas(building),
-                PreviewGdpDelta(building, currentGdp));
+                resourceDeltas,
+                PreviewGdpDelta(building, resourceDeltas, rates));
         }
 
         private IReadOnlyList<CivicBuildingResourceDeltaSnapshot> BuildBuildingResourceDeltas(BuildingDefinition building)
@@ -537,7 +548,7 @@ namespace Civic.Simulation
                 AddDelta(deltas, order, output.ResourceId, GetEffectiveOutputAmount(building, output));
             }
 
-            foreach (var effect in ActiveTechnologyEffects().Where(effect => effect.TargetBuildingId == building.Id))
+            foreach (var effect in ActiveTechnologyEffectsForBuilding(building.Id))
             {
                 if (effect.EffectType == TechnologyEffectType.OutputAdd)
                 {
@@ -562,12 +573,19 @@ namespace Civic.Simulation
                 .ToArray();
         }
 
-        private CivicNumber PreviewGdpDelta(BuildingDefinition building, CivicNumber currentGdp)
+        private CivicNumber PreviewGdpDelta(BuildingDefinition building, IReadOnlyList<CivicBuildingResourceDeltaSnapshot> resourceDeltas, CivicRateSet rates)
         {
-            State.Buildings[building.Id] = State.Buildings.TryGetValue(building.Id, out var count) ? count + 1 : 1;
-            var projectedGdp = CalculateRates().Gdp;
-            State.Buildings[building.Id] = count;
-            return projectedGdp - currentGdp;
+            var efficiency = rates.BuildingEfficiencies.TryGetValue(building.Id, out var currentEfficiency) ? currentEfficiency : 1d;
+            var delta = CivicNumber.Zero;
+            foreach (var output in resourceDeltas.Where(item => item.AmountPerSecond > CivicNumber.Zero))
+            {
+                if (!Data.ResourcesById.TryGetValue(output.ResourceId, out var resource) || resource.Category != ResourceCategory.Element) continue;
+                if (!rates.Prices.TryGetValue(output.ResourceId, out var price)) continue;
+                delta += output.AmountPerSecond * efficiency * price * Modifiers.Multiplier(
+                    CivicModifierEffectTypes.ResourceGdpMultiplier,
+                    output.ResourceId);
+            }
+            return delta;
         }
 
         private static void AddDelta(IDictionary<string, CivicNumber> deltas, ICollection<string> order, string resourceId, CivicNumber amount)
@@ -648,7 +666,7 @@ namespace Civic.Simulation
                     consumedDelta += CivicNumber.One;
                 }
 
-                foreach (var effect in ActiveTechnologyEffects().Where(effect => effect.TargetBuildingId == building.Id))
+                foreach (var effect in ActiveTechnologyEffectsForBuilding(building.Id))
                 {
                     if (effect.EffectType == TechnologyEffectType.OutputAdd && effect.OutputResourceId == resourceId)
                     {
@@ -1243,9 +1261,36 @@ namespace Civic.Simulation
             return total;
         }
 
-        private IEnumerable<TechnologyEffectDefinition> ActiveTechnologyEffects()
+        private IReadOnlyList<TechnologyEffectDefinition> ActiveTechnologyEffects()
         {
-            return Data.TechnologyEffects.Where(effect => State.ResearchedTechnologyIds.Contains(effect.TechnologyId));
+            EnsureTechnologyCaches();
+            return activeTechnologyEffectsCache;
+        }
+
+        private IReadOnlyList<TechnologyEffectDefinition> ActiveTechnologyEffectsForBuilding(string buildingId)
+        {
+            EnsureTechnologyCaches();
+            return activeTechnologyEffectsByBuilding.TryGetValue(buildingId, out var effects)
+                ? effects
+                : Array.Empty<TechnologyEffectDefinition>();
+        }
+
+        private void EnsureTechnologyCaches()
+        {
+            var researchCount = State.ResearchedTechnologyIds.Count;
+            if (technologyCacheResearchCount == researchCount) return;
+            activeTechnologyEffectsCache = Data.TechnologyEffects
+                .Where(effect => State.ResearchedTechnologyIds.Contains(effect.TechnologyId))
+                .ToArray();
+            activeTechnologyEffectsByBuilding = activeTechnologyEffectsCache
+                .Where(effect => !string.IsNullOrEmpty(effect.TargetBuildingId))
+                .GroupBy(effect => effect.TargetBuildingId, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+            unlockedPopulationConsumptionResourcesCache = Data.Resources.Where(resource =>
+                resource.Category == ResourceCategory.Element &&
+                resource.IsPopulationConsumption &&
+                IsResourceUnlocked(resource)).ToArray();
+            technologyCacheResearchCount = researchCount;
         }
 
         private IEnumerable<TechnologyEffectDefinition> TechnologyEffectsFor(string technologyId)
@@ -1440,12 +1485,10 @@ namespace Civic.Simulation
             return result;
         }
 
-        private IEnumerable<ResourceDefinition> UnlockedPopulationConsumptionResources()
+        private IReadOnlyList<ResourceDefinition> UnlockedPopulationConsumptionResources()
         {
-            return Data.Resources.Where(resource =>
-                resource.Category == ResourceCategory.Element &&
-                resource.IsPopulationConsumption &&
-                IsResourceUnlocked(resource));
+            EnsureTechnologyCaches();
+            return unlockedPopulationConsumptionResourcesCache;
         }
 
         private CivicNumber GetPopulationConsumptionPerBuilding(ResourceDefinition resource)

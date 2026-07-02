@@ -159,7 +159,8 @@ namespace Civic.Editor.UI
                 var resourcesButton = CreateSidebarButton(sideBar.transform, "ResourcesPanelButton", "자원", -90f);
                 var buildingsButton = CreateSidebarButton(sideBar.transform, "BuildingsPanelButton", "건물", -180f);
                 var technologiesButton = CreateSidebarButton(sideBar.transform, "TechnologiesPanelButton", "기술", -270f);
-                var modulesButton = CreateSidebarButton(sideBar.transform, "ModulesPanelButton", "모듈", -360f);
+                var nationButton = CreateSidebarButton(sideBar.transform, "NationPanelButton", "국가", -360f);
+                var modulesButton = CreateSidebarButton(sideBar.transform, "ModulesPanelButton", "모듈", -450f);
 
                 var detailPanel = GetOrCreateChild(root.transform, "LeftDetailPanel", typeof(RectTransform), typeof(Image));
                 SetRect(detailPanel.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(640f, -36f), new Vector2(1040f, -140f));
@@ -228,6 +229,17 @@ namespace Civic.Editor.UI
                 var technologyScroll = CreateScrollArea(technologyPanel.transform, "TechnologyScroll", technologyRowCount * 84f, 52f);
                 var technologyActionRows = CreateDetailActionRows(technologyScroll.Content, "TechnologyActionRow", "TechnologyInfoLabel", "TechnologyResearchButton", "기술 정보", "연구", technologyRowCount);
 
+                const int nationModifierRowCount = 64;
+                var nationPanel = GetOrCreateChild(detailPanel.transform, "NationDetailPanel", typeof(RectTransform));
+                SetStretchRect(nationPanel.GetComponent<RectTransform>(), 16f, 86f, 16f, 18f);
+                var nationStatus = GetOrCreateText(nationPanel.transform, "NationStatusLabel");
+                nationStatus.text = "현재 국가: 설립된 국가 없음";
+                nationStatus.fontSize = 17;
+                nationStatus.alignment = TextAnchor.MiddleLeft;
+                SetRect(nationStatus.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(12f, -24f), new Vector2(-24f, 40f));
+                var nationScroll = CreateScrollArea(nationPanel.transform, "NationModifierScroll", nationModifierRowCount * 56f, 52f);
+                var nationModifierRows = CreateNationModifierRows(nationScroll.Content, nationModifierRowCount);
+
                 var rightPanel = GetOrCreateChild(root.transform, "RightResourcePanel", typeof(RectTransform), typeof(Image));
                 SetRect(rightPanel.GetComponent<RectTransform>(), new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-190f, -36f), new Vector2(360f, -140f));
                 rightPanel.GetComponent<Image>().color = new Color(0.09f, 0.11f, 0.14f, 0.96f);
@@ -261,9 +273,11 @@ namespace Civic.Editor.UI
                 viewObject.FindProperty("resourceDetailPanel").objectReferenceValue = resourcePanel;
                 viewObject.FindProperty("buildingDetailPanel").objectReferenceValue = buildingPanel;
                 viewObject.FindProperty("technologyDetailPanel").objectReferenceValue = technologyPanel;
+                viewObject.FindProperty("nationDetailPanel").objectReferenceValue = nationPanel;
                 viewObject.FindProperty("resourcesPanelButton").objectReferenceValue = resourcesButton;
                 viewObject.FindProperty("buildingsPanelButton").objectReferenceValue = buildingsButton;
                 viewObject.FindProperty("technologiesPanelButton").objectReferenceValue = technologiesButton;
+                viewObject.FindProperty("nationPanelButton").objectReferenceValue = nationButton;
                 AssignObjectArray(viewObject, "resourceDetailRows", resourceRows.Rows);
                 AssignObjectArray(viewObject, "resourceSummaryLabels", resourceRows.SummaryLabels);
                 AssignObjectArray(viewObject, "resourceProducerBoxes", resourceRows.ProducerBoxes);
@@ -284,6 +298,14 @@ namespace Civic.Editor.UI
                 AssignObjectArray(viewObject, "technologyActionRows", technologyActionRows.Rows);
                 AssignObjectArray(viewObject, "technologyActionInfoLabels", technologyActionRows.InfoLabels);
                 AssignObjectArray(viewObject, "technologyActionButtons", technologyActionRows.Buttons);
+                viewObject.FindProperty("nationStatusLabel").objectReferenceValue = nationStatus;
+                AssignObjectArray(viewObject, "nationModifierRows", nationModifierRows.Rows);
+                AssignObjectArray(viewObject, "nationModifierSummaryLabels", nationModifierRows.SummaryLabels);
+                AssignObjectArray(viewObject, "nationModifierDetailRoots", nationModifierRows.DetailRoots);
+                AssignObjectArray(viewObject, "nationModifierDetailLabels", nationModifierRows.DetailLabels);
+                AssignObjectArray(viewObject, "nationModifierExpandButtons", nationModifierRows.ExpandButtons);
+                AssignObjectArray(viewObject, "nationModifierExpandLabels", nationModifierRows.ExpandLabels);
+                AssignObjectArray(viewObject, "nationModifierLayouts", nationModifierRows.Layouts);
                 viewObject.FindProperty("foodToggleButton").objectReferenceValue = foodToggleButton;
                 viewObject.FindProperty("tooltipView").objectReferenceValue = tooltipView;
                 viewObject.ApplyModifiedPropertiesWithoutUndo();
@@ -555,12 +577,18 @@ namespace Civic.Editor.UI
             tooltipRect.anchoredPosition = Vector2.zero;
             tooltipRect.sizeDelta = new Vector2(360f, 160f);
             tooltipRect.localScale = Vector3.one;
-            tooltipObject.GetComponent<Image>().color = new Color(0.02f, 0.025f, 0.03f, 0.96f);
+            var tooltipImage = tooltipObject.GetComponent<Image>();
+            tooltipImage.color = new Color(0.02f, 0.025f, 0.03f, 0.96f);
+            tooltipImage.raycastTarget = false;
+            var tooltipCanvasGroup = GetOrAdd<CanvasGroup>(tooltipObject);
+            tooltipCanvasGroup.interactable = false;
+            tooltipCanvasGroup.blocksRaycasts = false;
 
             var label = GetOrCreateText(tooltipObject.transform, "BodyLabel");
             label.text = "Tooltip";
             label.fontSize = 15;
             label.alignment = TextAnchor.UpperLeft;
+            label.raycastTarget = false;
             SetStretchRect(label.rectTransform, 12f, 10f, 12f, 10f);
 
             var tooltip = GetOrAdd<CivicTooltipView>(tooltipObject);
@@ -650,6 +678,76 @@ namespace Civic.Editor.UI
             return new DetailActionRows(rows, infoLabels, buttons);
         }
 
+        private static NationModifierRows CreateNationModifierRows(Transform parent, int count)
+        {
+            var verticalLayout = GetOrAdd<VerticalLayoutGroup>(parent.gameObject);
+            verticalLayout.padding = new RectOffset(0, 24, 0, 8);
+            verticalLayout.spacing = 6f;
+            verticalLayout.childAlignment = TextAnchor.UpperLeft;
+            verticalLayout.childControlWidth = true;
+            verticalLayout.childControlHeight = true;
+            verticalLayout.childForceExpandWidth = true;
+            verticalLayout.childForceExpandHeight = false;
+            var fitter = GetOrAdd<ContentSizeFitter>(parent.gameObject);
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var rows = new GameObject[count];
+            var summaryLabels = new Text[count];
+            var detailRoots = new GameObject[count];
+            var detailLabels = new Text[count];
+            var expandButtons = new Button[count];
+            var expandLabels = new Text[count];
+            var layouts = new LayoutElement[count];
+            for (var index = 0; index < count; index++)
+            {
+                var row = GetOrCreateChild(parent, $"NationModifierRow{index + 1:00}", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+                row.GetComponent<Image>().color = new Color(0.045f, 0.065f, 0.09f, 1f);
+                var layout = row.GetComponent<LayoutElement>();
+                layout.minHeight = 52f;
+                layout.preferredHeight = 52f;
+
+                var summary = GetOrCreateText(row.transform, "SummaryLabel");
+                summary.text = "통합 modifier";
+                summary.fontSize = 15;
+                summary.alignment = TextAnchor.MiddleLeft;
+                SetRect(summary.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(12f, -26f), new Vector2(-60f, 44f));
+
+                var expandButton = GetOrCreateButton(row.transform, "ExpandButton");
+                SetRect(expandButton.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-26f, -26f), new Vector2(40f, 40f));
+                expandButton.GetComponent<Image>().color = new Color(0.18f, 0.31f, 0.46f, 1f);
+                ConfigureButtonColors(expandButton);
+                var expandLabel = GetOrCreateText(expandButton.transform, "Label");
+                expandLabel.text = "+";
+                expandLabel.fontSize = 22;
+                expandLabel.alignment = TextAnchor.MiddleCenter;
+                SetRect(expandLabel.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+                var detailRoot = GetOrCreateChild(row.transform, "Detail", typeof(RectTransform), typeof(Image));
+                SetStretchRect(detailRoot.GetComponent<RectTransform>(), 12f, 52f, 12f, 8f);
+                detailRoot.GetComponent<Image>().color = new Color(0.075f, 0.105f, 0.145f, 1f);
+                var detailLabel = GetOrCreateText(detailRoot.transform, "Label");
+                detailLabel.text = "세부 기여 내역";
+                detailLabel.fontSize = 14;
+                detailLabel.alignment = TextAnchor.UpperLeft;
+                detailLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
+                detailLabel.verticalOverflow = VerticalWrapMode.Overflow;
+                SetStretchRect(detailLabel.rectTransform, 10f, 8f, 10f, 8f);
+                detailRoot.SetActive(false);
+                row.SetActive(false);
+
+                rows[index] = row;
+                summaryLabels[index] = summary;
+                detailRoots[index] = detailRoot;
+                detailLabels[index] = detailLabel;
+                expandButtons[index] = expandButton;
+                expandLabels[index] = expandLabel;
+                layouts[index] = layout;
+            }
+
+            return new NationModifierRows(rows, summaryLabels, detailRoots, detailLabels, expandButtons, expandLabels, layouts);
+        }
+
         private static void AssignObjectArray<T>(SerializedObject serializedObject, string propertyName, T[] values)
             where T : UnityEngine.Object
         {
@@ -673,6 +771,35 @@ namespace Civic.Editor.UI
             public GameObject[] Rows { get; }
             public Text[] InfoLabels { get; }
             public Button[] Buttons { get; }
+        }
+
+        private readonly struct NationModifierRows
+        {
+            public NationModifierRows(
+                GameObject[] rows,
+                Text[] summaryLabels,
+                GameObject[] detailRoots,
+                Text[] detailLabels,
+                Button[] expandButtons,
+                Text[] expandLabels,
+                LayoutElement[] layouts)
+            {
+                Rows = rows;
+                SummaryLabels = summaryLabels;
+                DetailRoots = detailRoots;
+                DetailLabels = detailLabels;
+                ExpandButtons = expandButtons;
+                ExpandLabels = expandLabels;
+                Layouts = layouts;
+            }
+
+            public GameObject[] Rows { get; }
+            public Text[] SummaryLabels { get; }
+            public GameObject[] DetailRoots { get; }
+            public Text[] DetailLabels { get; }
+            public Button[] ExpandButtons { get; }
+            public Text[] ExpandLabels { get; }
+            public LayoutElement[] Layouts { get; }
         }
 
         private readonly struct ScrollArea
@@ -1059,9 +1186,9 @@ namespace Civic.Editor.UI
             var categoryTabRows = Array.Empty<GameObject>();
             var categoryTabButtons = Array.Empty<Button>();
             var categoryTabLabels = Array.Empty<Text>();
-            if (definition.Id == CivicFeatureRegistry.Politics)
+            if (definition.Id == CivicFeatureRegistry.Politics || definition.Id == CivicFeatureRegistry.GreatPeople)
             {
-                const int categoryTabCapacity = 8;
+                var categoryTabCapacity = definition.Id == CivicFeatureRegistry.Politics ? 8 : 2;
                 categoryTabRoot = GetOrCreateChild(root.transform, "CategoryTabArea", typeof(RectTransform));
                 SetRect(categoryTabRoot.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -116f), new Vector2(-36f, 52f));
                 categoryTabRows = new GameObject[categoryTabCapacity];
@@ -1076,7 +1203,7 @@ namespace Civic.Editor.UI
                     button.targetGraphic = tab.GetComponent<Image>();
                     ConfigureButtonColors(button);
                     var label = GetOrCreateText(tab.transform, "Label");
-                    label.text = "정치 그룹";
+                    label.text = definition.Id == CivicFeatureRegistry.Politics ? "정치 그룹" : "위인 탭";
                     label.fontSize = 13;
                     label.alignment = TextAnchor.MiddleCenter;
                     SetRect(label.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
@@ -1111,6 +1238,46 @@ namespace Civic.Editor.UI
                 SetStretchRect(impossibleFilterLabel.rectTransform, 52f, 0f, 12f, 0f);
             }
 
+            GameObject filterRoot = null;
+            var filterRows = Array.Empty<GameObject>();
+            var filterToggles = Array.Empty<Toggle>();
+            var filterLabels = Array.Empty<Text>();
+            if (definition.Id == CivicFeatureRegistry.GreatPeople)
+            {
+                const int filterCount = 3;
+                filterRoot = GetOrCreateChild(root.transform, "FilterArea", typeof(RectTransform));
+                SetRect(filterRoot.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -168f), new Vector2(-36f, 44f));
+                filterRows = new GameObject[filterCount];
+                filterToggles = new Toggle[filterCount];
+                filterLabels = new Text[filterCount];
+                for (var index = 0; index < filterCount; index++)
+                {
+                    var filterRow = GetOrCreateChild(filterRoot.transform, $"Filter{index + 1:00}", typeof(RectTransform));
+                    SetRect(filterRow.GetComponent<RectTransform>(), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(160f + index * 310f, 0f), new Vector2(300f, 38f));
+                    var toggleObject = GetOrCreateChild(filterRow.transform, "Toggle", typeof(RectTransform), typeof(Image), typeof(Toggle));
+                    SetRect(toggleObject.GetComponent<RectTransform>(), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(18f, 0f), new Vector2(28f, 28f));
+                    var toggleImage = toggleObject.GetComponent<Image>();
+                    toggleImage.color = new Color(0.16f, 0.24f, 0.34f, 1f);
+                    var checkmark = GetOrCreateChild(toggleObject.transform, "Checkmark", typeof(RectTransform), typeof(Image));
+                    SetStretchRect(checkmark.GetComponent<RectTransform>(), 5f, 5f, 5f, 5f);
+                    var checkmarkImage = checkmark.GetComponent<Image>();
+                    checkmarkImage.color = new Color(0.45f, 0.78f, 0.95f, 1f);
+                    var toggle = toggleObject.GetComponent<Toggle>();
+                    toggle.targetGraphic = toggleImage;
+                    toggle.graphic = checkmarkImage;
+                    toggle.isOn = true;
+                    var label = GetOrCreateText(filterRow.transform, "Label");
+                    label.text = "위인 필터";
+                    label.fontSize = 14;
+                    label.alignment = TextAnchor.MiddleLeft;
+                    SetStretchRect(label.rectTransform, 42f, 0f, 4f, 0f);
+                    filterRows[index] = filterRow;
+                    filterToggles[index] = toggle;
+                    filterLabels[index] = label;
+                }
+                filterRoot.SetActive(false);
+            }
+
             var usesDescriptionCards = definition.Id == CivicFeatureRegistry.StartCivilizations ||
                 definition.Id == CivicFeatureRegistry.NationFormation ||
                 definition.Id == CivicFeatureRegistry.Politics ||
@@ -1118,7 +1285,7 @@ namespace Civic.Editor.UI
                 definition.Id == CivicFeatureRegistry.GreatPeople;
             var usesPersonChoices = definition.Id == CivicFeatureRegistry.GreatPeople;
             var rowStride = usesPersonChoices ? 208f : usesDescriptionCards ? 160f : 72f;
-            var controlsTopOffset = categoryTabRoot != null || impossibleFilterRoot != null ? 150f : 92f;
+            var controlsTopOffset = filterRoot != null ? 210f : categoryTabRoot != null || impossibleFilterRoot != null ? 150f : 92f;
             var scroll = CreateScrollArea(root.transform, "DomainScroll", rowCount * rowStride, controlsTopOffset);
             var rows = new CivicModuleActionRow[rowCount];
             var expectedNames = new HashSet<string>(Enumerable.Range(1, rowCount).Select(index => $"DomainActionRow{index:00}"));
@@ -1225,6 +1392,10 @@ namespace Civic.Editor.UI
             serialized.FindProperty("impossibleFilterRoot").objectReferenceValue = impossibleFilterRoot;
             serialized.FindProperty("impossibleFilterToggle").objectReferenceValue = impossibleFilterToggle;
             serialized.FindProperty("impossibleFilterLabel").objectReferenceValue = impossibleFilterLabel;
+            serialized.FindProperty("filterRoot").objectReferenceValue = filterRoot;
+            AssignObjectArray(serialized, "filterRows", filterRows);
+            AssignObjectArray(serialized, "filterToggles", filterToggles);
+            AssignObjectArray(serialized, "filterLabels", filterLabels);
             serialized.ApplyModifiedPropertiesWithoutUndo();
             root.SetActive(domainIndex == 0);
             return view;

@@ -93,7 +93,7 @@ namespace Civic.Simulation.Modules
 
     public sealed class CivicPersonAbilityDefinition
     {
-        public CivicPersonAbilityDefinition(string personId, string id, string effectType, string targetId, double amount, double duration, int usesPerRun, string capGroup = "", string runtimeEffectType = "", string runtimeTargetId = "")
+        public CivicPersonAbilityDefinition(string personId, string id, string effectType, string targetId, double amount, double duration, int usesPerRun, string capGroup = "", string runtimeEffectType = "", string runtimeTargetId = "", string displayNameKo = "", string descriptionKo = "")
         {
             PersonId = personId;
             Id = id;
@@ -105,6 +105,8 @@ namespace Civic.Simulation.Modules
             CapGroup = capGroup;
             RuntimeEffectType = runtimeEffectType;
             RuntimeTargetId = runtimeTargetId;
+            DisplayNameKo = string.IsNullOrWhiteSpace(displayNameKo) ? id : displayNameKo;
+            DescriptionKo = descriptionKo ?? string.Empty;
         }
 
         public string PersonId { get; }
@@ -117,6 +119,8 @@ namespace Civic.Simulation.Modules
         public string CapGroup { get; }
         public string RuntimeEffectType { get; }
         public string RuntimeTargetId { get; }
+        public string DisplayNameKo { get; }
+        public string DescriptionKo { get; }
         public CivicResolvedModuleEffect Resolve() => CivicProvisionalEffect.Resolve(EffectType, TargetId, RuntimeEffectType, RuntimeTargetId, Amount, Duration, CapGroup);
     }
 
@@ -174,7 +178,7 @@ namespace Civic.Simulation.Modules
             var abilities = CivicCsvParser.Parse(abilitiesCsv, errors, "person_abilities.csv").Select(row => new CivicPersonAbilityDefinition(
                 Value(row, "personId"), Value(row, "id"), Value(row, "effectType"), Value(row, "targetId"), Number(row, "amount", errors, "person_abilities.csv"),
                 Number(row, "duration", errors, "person_abilities.csv"), Integer(row, "usesPerRun", errors, "person_abilities.csv"), Value(row, "capGroup"),
-                Value(row, "runtimeEffectType"), Value(row, "runtimeTargetId"))).ToArray();
+                Value(row, "runtimeEffectType"), Value(row, "runtimeTargetId"), Value(row, "displayNameKo"), Value(row, "descriptionKo"))).ToArray();
 
             var ids = people.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
             var positionIds = positions.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);

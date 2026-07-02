@@ -145,7 +145,6 @@ namespace Civic.Simulation.Modules
                 }
             }
 
-            Context.Simulation.RefreshSnapshot();
             PublishMetrics();
             RebuildSnapshot();
         }

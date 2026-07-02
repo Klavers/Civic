@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Civic.Simulation;
 using Civic.Features;
@@ -6,16 +7,24 @@ using Civic.Simulation.Modules;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
+using Unity.Profiling;
 
 namespace Civic.UI
 {
     public sealed class CivicHudController : MonoBehaviour
     {
+        private static readonly ProfilerMarker UpdateProfilerMarker = new ProfilerMarker("Civic.Hud.Update");
+        private static readonly ProfilerMarker AdvanceProfilerMarker = new ProfilerMarker("Civic.Hud.Advance");
+        private static readonly ProfilerMarker CoreHudProfilerMarker = new ProfilerMarker("Civic.Hud.CoreRender");
+        private static readonly ProfilerMarker ModuleHudProfilerMarker = new ProfilerMarker("Civic.Hud.ModuleRender");
+        private static readonly ProfilerMarker EventHudProfilerMarker = new ProfilerMarker("Civic.Hud.EventRender");
+
         [SerializeField] private CivicHudView view;
         [SerializeField] private CivicGameDataSource dataSource;
         [SerializeField] private double simulationSpeed = 1d;
         [SerializeField] private CivicModulePanelView modulePanelView;
         [SerializeField] private CivicHudOverlayView overlayView;
+        [SerializeField, Min(0.05f)] private float periodicUiRefreshSeconds = 0.2f;
 
         private CivicGameSimulation simulation;
         private CivicModuleRuntime moduleRuntime;
@@ -25,6 +34,13 @@ namespace Civic.UI
         private bool prestigeConfirmationPending;
         private string lastAutoOpenedEventId = string.Empty;
         private bool debugInstantActionsEnabled;
+        private IReadOnlyList<CivicNationModifierGroup> nationModifierSummaries = Array.Empty<CivicNationModifierGroup>();
+        private int nationModifierRevision = -1;
+        private int nationTechnologyCount = -1;
+        private string nationSummaryNationId = string.Empty;
+        private string nationSummaryName = string.Empty;
+        private CivicGameSnapshot lastRenderedSnapshot;
+        private float periodicUiRefreshElapsed;
 
         public CivicHudView View => view;
         public CivicGameSimulation Simulation => simulation;
@@ -57,6 +73,7 @@ namespace Civic.UI
             view.ResourcesPanelRequested += ShowResourcesPanel;
             view.BuildingsPanelRequested += ShowBuildingsPanel;
             view.TechnologiesPanelRequested += ShowTechnologiesPanel;
+            view.NationPanelRequested += ShowNationPanel;
             view.DetailPanelCloseRequested += CloseDetailPanel;
             view.BuildRequested += BuildRequestedBuilding;
             view.ResearchRequested += ResearchRequestedTechnology;
@@ -89,6 +106,7 @@ namespace Civic.UI
             view.ResourcesPanelRequested -= ShowResourcesPanel;
             view.BuildingsPanelRequested -= ShowBuildingsPanel;
             view.TechnologiesPanelRequested -= ShowTechnologiesPanel;
+            view.NationPanelRequested -= ShowNationPanel;
             view.DetailPanelCloseRequested -= CloseDetailPanel;
             view.BuildRequested -= BuildRequestedBuilding;
             view.ResearchRequested -= ResearchRequestedTechnology;
@@ -118,18 +136,64 @@ namespace Civic.UI
 
         private void Update()
         {
-            HandleKeyboardInput();
-            moduleRuntime?.Advance(Time.deltaTime * simulationSpeed);
-            Render();
+            using (UpdateProfilerMarker.Auto())
+            {
+                HandleKeyboardInput();
+                using (AdvanceProfilerMarker.Auto())
+                {
+                    moduleRuntime?.Advance(Time.deltaTime * simulationSpeed);
+                }
+                periodicUiRefreshElapsed += Time.unscaledDeltaTime;
+                var periodicRefreshDue = periodicUiRefreshElapsed >= periodicUiRefreshSeconds;
+                RenderFrame(periodicRefreshDue);
+                if (periodicRefreshDue) periodicUiRefreshElapsed = 0f;
+            }
         }
 
         private void Render()
         {
-            if (simulation != null && view != null)
+            RenderCoreHud();
+            RenderModuleHud(true);
+            RenderEventHud();
+            periodicUiRefreshElapsed = 0f;
+        }
+
+        private void RenderFrame(bool periodicRefreshDue)
+        {
+            if (simulation == null || view == null) return;
+            if (!ReferenceEquals(lastRenderedSnapshot, simulation.Snapshot)) RenderCoreHud();
+            if (periodicRefreshDue)
+            {
+                RenderModuleHud(false);
+                RenderEventHud();
+            }
+        }
+
+        private void RenderCoreHud()
+        {
+            if (simulation == null || view == null) return;
+            using (CoreHudProfilerMarker.Auto())
             {
                 EnsureSelectedTechnologyEra(simulation.Snapshot);
-                view.Render(simulation.Snapshot, panelMode, showFoodChildren, selectedTechnologyEraId);
+                EnsureNationModifierSummary();
+                view.Render(simulation.Snapshot, panelMode, showFoodChildren, selectedTechnologyEraId, nationModifierSummaries, nationSummaryName);
+                lastRenderedSnapshot = simulation.Snapshot;
+            }
+        }
+
+        private void RenderModuleHud(bool force)
+        {
+            if (modulePanelView == null || (!force && !modulePanelView.IsOpen)) return;
+            using (ModuleHudProfilerMarker.Auto())
+            {
                 modulePanelView.Bind(moduleRuntime, prestigeConfirmationPending);
+            }
+        }
+
+        private void RenderEventHud()
+        {
+            using (EventHudProfilerMarker.Auto())
+            {
                 RenderEventUi();
             }
         }
@@ -445,6 +509,13 @@ namespace Civic.UI
             Render();
         }
 
+        private void ShowNationPanel()
+        {
+            modulePanelView?.ClosePanel();
+            panelMode = CivicHudPanelMode.Nation;
+            Render();
+        }
+
         private void CloseDetailPanel()
         {
             panelMode = CivicHudPanelMode.None;
@@ -515,6 +586,20 @@ namespace Civic.UI
                     return;
                 }
             }
+        }
+
+        private void EnsureNationModifierSummary()
+        {
+            if (simulation == null || moduleRuntime == null) return;
+            var nationId = moduleRuntime.GetModule<CivicNationModule>(CivicFeatureRegistry.NationFormation)?.CurrentNationId ?? string.Empty;
+            var revision = simulation.Modifiers.Revision;
+            var technologyCount = simulation.State.ResearchedTechnologyIds.Count;
+            if (nationModifierRevision == revision && nationTechnologyCount == technologyCount && nationSummaryNationId == nationId) return;
+            nationModifierSummaries = CivicNationModifierSummaryBuilder.BuildGroups(moduleRuntime);
+            nationSummaryName = CivicNationModifierSummaryBuilder.CurrentNationName(moduleRuntime);
+            nationModifierRevision = revision;
+            nationTechnologyCount = technologyCount;
+            nationSummaryNationId = nationId;
         }
     }
 }

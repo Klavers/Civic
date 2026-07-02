@@ -32,8 +32,10 @@ namespace Civic.UI
         public GameObject DescriptionRoot => descriptionRoot;
         public Text DescriptionLabel => descriptionLabel;
         public Button ActionButton => actionButton;
+        public CivicTooltipTrigger ActionTooltip => tooltip;
         public IReadOnlyList<Button> ChoiceButtons => choiceButtons ?? Array.Empty<Button>();
         public IReadOnlyList<Text> ChoiceLabels => choiceLabels ?? Array.Empty<Text>();
+        public IReadOnlyList<CivicTooltipTrigger> ChoiceTooltips => choiceTooltips ?? Array.Empty<CivicTooltipTrigger>();
 
         public void Bind(string rowKey, string info, string description, string actionText, bool interactable, string tooltipText, Action<string> onRequested)
         {
@@ -47,7 +49,6 @@ namespace Civic.UI
             actionButton.onClick.RemoveListener(HandleRequested);
             actionButton.onClick.AddListener(HandleRequested);
             tooltip.SetTooltipText(tooltipText ?? string.Empty);
-            HideChoices();
         }
 
         public void BindChoices(
@@ -62,13 +63,18 @@ namespace Civic.UI
             choiceKeys = new string[ChoiceButtons.Count];
             ClearChoiceListeners();
             choiceHandlers = new UnityAction[ChoiceButtons.Count];
-            if (choiceRoot != null) choiceRoot.SetActive(count > 0);
+            SetChoicesVisible(count > 0);
             SetDescriptionBottom(count > 0 ? 48f : 0f);
             for (var index = 0; index < ChoiceButtons.Count; index++)
             {
                 var visible = index < count;
-                ChoiceButtons[index].gameObject.SetActive(visible);
-                if (!visible) continue;
+                if (ChoiceButtons[index].gameObject.activeSelf != visible) ChoiceButtons[index].gameObject.SetActive(visible);
+                if (!visible)
+                {
+                    choiceKeys[index] = string.Empty;
+                    if (choiceTooltips != null && index < choiceTooltips.Length) choiceTooltips[index].SetTooltipText(string.Empty);
+                    continue;
+                }
                 choiceKeys[index] = keys[index] ?? string.Empty;
                 ChoiceLabels[index].text = labels != null && index < labels.Count ? labels[index] : "선택";
                 ChoiceButtons[index].interactable = interactable == null || index >= interactable.Count || interactable[index];
@@ -99,8 +105,13 @@ namespace Civic.UI
         private void HideChoices()
         {
             ClearChoiceListeners();
-            if (choiceRoot != null) choiceRoot.SetActive(false);
+            SetChoicesVisible(false);
             SetDescriptionBottom(0f);
+        }
+
+        private void SetChoicesVisible(bool visible)
+        {
+            if (choiceRoot != null && choiceRoot.activeSelf != visible) choiceRoot.SetActive(visible);
         }
 
         private void ClearChoiceListeners()

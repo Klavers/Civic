@@ -59,6 +59,8 @@ namespace Civic.UI.Tests
             var peoplePanel = modulePanel.DomainPanels.Single(item => item.FeatureId == CivicFeatureRegistry.GreatPeople);
             Assert.That(peoplePanel.Rows.Count, Is.EqualTo(24));
             Assert.That(peoplePanel.Rows.All(row => row.ChoiceButtons.Count == 4), Is.True);
+            Assert.That(peoplePanel.CategoryTabButtons.Count, Is.EqualTo(2));
+            Assert.That(peoplePanel.FilterToggles.Count, Is.EqualTo(3));
             Assert.That(overlay.DebugGrantResourcesButton, Is.Not.Null);
             Assert.That(overlay.DebugResearchAllButton, Is.Not.Null);
             Assert.That(overlay.DebugGrantPrestigeButton, Is.Not.Null);
@@ -105,10 +107,19 @@ namespace Civic.UI.Tests
             Assert.That(view.TechnologyActionInfoLabels, Has.All.Not.Null);
             Assert.That(view.TechnologyActionButtons, Has.All.Not.Null);
             Assert.That(view.FoodToggleButton, Is.Not.Null);
+            Assert.That(view.NationPanelButton, Is.Not.Null);
+            Assert.That(view.NationDetailPanel, Is.Not.Null);
+            Assert.That(view.NationModifierRows.Count, Is.EqualTo(64));
+            Assert.That(view.NationModifierExpandButtons.Count, Is.EqualTo(64));
+            Assert.That(view.NationModifierDetailLabels.Count, Is.EqualTo(64));
+            Assert.That(view.NationModifierLayouts.Count, Is.EqualTo(64));
+            Assert.That(view.NationModifierRows[0].transform.parent.GetComponent<VerticalLayoutGroup>().childControlHeight, Is.True);
+            Assert.That(view.NationModifierDetailLabels.All(label => label.verticalOverflow == VerticalWrapMode.Overflow), Is.True);
             Assert.That(view.DetailPanelRoot, Is.Not.Null);
             Assert.That(view.DetailCloseButton, Is.Not.Null);
             Assert.That(view.TooltipView, Is.Not.Null);
             Assert.That(view.TooltipView.HasRequiredReferences, Is.True);
+            Assert.That(view.TooltipView.DoesNotBlockRaycasts, Is.True);
             Assert.That(
                 PrefabUtility.GetPrefabAssetType(hud),
                 Is.EqualTo(PrefabAssetType.Variant));
@@ -139,6 +150,7 @@ namespace Civic.UI.Tests
             Assert.That(CountChildrenNamed(hudBase, "ResourcesPanelButton"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "BuildingsPanelButton"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "TechnologiesPanelButton"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "NationPanelButton"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "ModulesPanelButton"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "ModulePanel"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "DomainPanel01"), Is.EqualTo(1));
@@ -147,9 +159,12 @@ namespace Civic.UI.Tests
             Assert.That(CountChildrenNamed(hudBase, "DomainActionRow18"), Is.EqualTo(8));
             Assert.That(CountChildrenNamed(hudBase, "DomainActionRow24"), Is.EqualTo(3));
             Assert.That(CountChildrenNamed(hudBase, "DomainActionRow64"), Is.EqualTo(1));
-            Assert.That(CountChildrenNamed(hudBase, "CategoryTabArea"), Is.EqualTo(1));
-            Assert.That(CountChildrenNamed(hudBase, "CategoryTab01"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "CategoryTabArea"), Is.EqualTo(2));
+            Assert.That(CountChildrenNamed(hudBase, "CategoryTab01"), Is.EqualTo(2));
             Assert.That(CountChildrenNamed(hudBase, "CategoryTab08"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "FilterArea"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "Filter01"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "Filter03"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "ImpossibleFilter"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "Description"), Is.EqualTo(202));
             Assert.That(CountChildrenNamed(hudBase, "ModuleActionRow01"), Is.Zero);
@@ -184,6 +199,8 @@ namespace Civic.UI.Tests
             Assert.That(CountChildrenNamed(hudBase, "TechnologyInfoLabel"), Is.EqualTo(12));
             Assert.That(CountChildrenNamed(hudBase, "TechnologyResearchButton01"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "TechnologyResearchButton12"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "NationModifierRow01"), Is.EqualTo(1));
+            Assert.That(CountChildrenNamed(hudBase, "NationModifierRow64"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "Tooltip"), Is.EqualTo(1));
             Assert.That(CountChildrenNamed(hudBase, "FoodToggleButton"), Is.EqualTo(1));
             Assert.That(UiPrefabValidator.CollectErrors(TestGenerated, TestEditable), Is.Empty);
