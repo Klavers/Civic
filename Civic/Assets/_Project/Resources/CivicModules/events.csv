@@ -1,0 +1,16 @@
+id,category,titleKo,descriptionKo,triggerMode,baseWeight,pitySeconds,cooldownSeconds,maxPerRun,pauseByDefault,requiredFeatureIds
+first_print,technology,첫 인쇄물,인쇄술이 지식과 통치와 상업의 방향을 바꿉니다,certain,0,0,0,1,true,
+promise_of_steam,technology,증기의 약속,증기기관의 힘을 어디에 우선 배분할지 결정합니다,certain,0,0,0,1,true,
+information_deluge,technology,정보의 홍수,정보시대의 네트워크 운영 방향을 결정합니다,certain,0,0,0,1,true,
+breadline_rumor,resource,빵줄의 소문,장기간 식량 부족으로 불안이 커집니다,conditional,0.10,180,300,2,true,
+wood_flood,resource,목재 범람,과잉 목재를 성장 기회로 전환할 수 있습니다,conditional,0.10,240,300,2,false,
+black_winter_coal,resource,석탄의 검은 겨울,산업용 석탄 부족에 대응해야 합니다,conditional,0.10,180,300,2,true,
+founding_conference,politics,건국회의,국가 설립의 방향과 속도를 결정합니다,certain,0,0,0,1,true,identity.nationFormation
+franchise_petition,politics,투표권 청원,보통선거를 요구하는 청원이 제출됐습니다,certain,0,0,0,1,true,governance.politics
+welfare_budget_wave,politics,복지 예산 파동,보편 사회보장의 재원을 마련해야 합니다,certain,0,0,0,1,true,governance.politics
+dream_previous_civilization,meta,이전 문명의 꿈,이전 런의 기억 중 하나를 새 문명에 남깁니다,certain,0,0,0,1,true,meta.prestige
+challenger_invitation,meta,도전자의 초대,더 어려운 런 제약과 보상을 선택할 수 있습니다,certain,0,0,0,1,true,progress.achievements;meta.prestige
+blank_chronicle_page,meta,연대기의 빈 페이지,미발견 비밀 사건을 추적할 단서를 고릅니다,certain,0,0,0,1,false,meta.prestige
+ruins_beneath_foundation,wonder,기초석 아래의 유적,불가사의 공사 중 고대 유적이 발견됐습니다,certain,0,0,0,1,true,projects.wonders
+rivalry_of_great_people,people,위인의 경쟁,서로 다른 직책의 위인들이 국정 주도권을 놓고 경쟁합니다,conditional,0.20,60,180,1,true,people.greatPeople
+last_blueprint,people,마지막 설계도,은퇴를 앞둔 기술자가 마지막 선택을 요청합니다,certain,0,0,0,1,true,people.greatPeople;projects.wonders

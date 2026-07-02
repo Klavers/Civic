@@ -1,7 +1,9 @@
 {
   "name": "Civic.Simulation.Runtime",
   "rootNamespace": "Civic.Simulation",
-  "references": [],
+  "references": [
+    "Civic.Features.Runtime"
+  ],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

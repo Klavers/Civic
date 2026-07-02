@@ -1,3 +1,4 @@
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -9,21 +10,35 @@ namespace Civic.UI
         [SerializeField] private Text bodyLabel;
         [SerializeField] private Vector2 screenOffset = new Vector2(18f, -18f);
 
-        public bool HasRequiredReferences => panel != null && bodyLabel != null;
+        private object activeOwner;
 
-        private void Awake()
+        public bool HasRequiredReferences => panel != null && bodyLabel != null && DoesNotBlockRaycasts;
+        public bool IsVisible => panel != null && panel.gameObject.activeSelf;
+        public bool DoesNotBlockRaycasts
         {
-            Hide();
+            get
+            {
+                if (panel == null) return false;
+                var canvasGroup = panel.GetComponent<CanvasGroup>();
+                return canvasGroup != null && !canvasGroup.blocksRaycasts && !canvasGroup.interactable &&
+                    panel.GetComponentsInChildren<Graphic>(true).All(graphic => !graphic.raycastTarget);
+            }
         }
 
         public void Show(string text, Vector2 screenPosition)
         {
+            Show(null, text, screenPosition);
+        }
+
+        public void Show(object owner, string text, Vector2 screenPosition)
+        {
             if (string.IsNullOrWhiteSpace(text) || !HasRequiredReferences)
             {
-                Hide();
+                Hide(owner);
                 return;
             }
 
+            activeOwner = owner;
             bodyLabel.text = text;
             panel.gameObject.SetActive(true);
             LayoutRebuilder.ForceRebuildLayoutImmediate(panel);
@@ -48,10 +63,21 @@ namespace Civic.UI
 
         public void Hide()
         {
+            activeOwner = null;
             if (panel != null)
             {
                 panel.gameObject.SetActive(false);
             }
+        }
+
+        public void Hide(object owner)
+        {
+            if (!ReferenceEquals(activeOwner, owner))
+            {
+                return;
+            }
+
+            Hide();
         }
     }
 }

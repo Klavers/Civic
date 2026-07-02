@@ -116,6 +116,7 @@ namespace Civic.Editor.UI
         {
             var view = hud.GetComponent<CivicHudView>();
             var controller = hud.GetComponent<CivicHudController>();
+            var modulePanel = hud.GetComponent<CivicModulePanelView>();
             if (view == null || !view.HasRequiredReferences)
             {
                 errors.Add("CivicHudView is missing or has unassigned serialized references.");
@@ -124,6 +125,11 @@ namespace Civic.Editor.UI
             if (controller == null || !controller.HasRequiredReferences || controller.View != view)
             {
                 errors.Add("CivicHudController is missing, lacks required references, or is not bound to CivicHudView.");
+            }
+
+            if (modulePanel == null || !modulePanel.HasRequiredReferences || controller == null || controller.ModulePanelView != modulePanel)
+            {
+                errors.Add("CivicHud module panel is missing or has unassigned serialized references.");
             }
 
             if (controller != null && controller.DataSource == null)

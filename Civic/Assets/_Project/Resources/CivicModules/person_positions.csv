@@ -1,0 +1,5 @@
+id,displayNameKo,descriptionKo,order,requiredFeatureIds
+leader,국가지도자,국가 전반의 생산·재정·통치 방향에 영향을 주는 최고 직책,0,
+security,군사안보담당관,군사 시스템 도입 전까지 정당성·개혁 저항·사건 안정성을 담당하는 임시 민정 직책,1,
+science,과학연구담당관,과학 생산과 기술 연구 및 지식 기반 성장에 영향을 주는 직책,2,
+society_economy,사회경제담당관,인구 소비·생활수준·시장·국고 등 사회경제 운영에 영향을 주는 직책,3,

@@ -1,0 +1,11 @@
+achievementId,effectType,targetId,amount,capGroup
+thriving_settlement,populationBaseAdd,population,1,housing_population
+heart_of_industry,resourceGdpMultiplier,*,0.02,resource_gdp
+witness_of_ages,technologyCostMultiplier,*,-0.02,technology_cost
+balanced_budget,treasuryIncomeMultiplier,treasury,0.02,treasury_income
+shortage_free_city,populationConsumptionMultiplier,*,-0.02,population_consumption
+small_government,constructionTreasuryCostMultiplier,construction_sector,-0.02,construction_treasury
+wheat_empire,resourceOutputMultiplier,wheat,0.03,resource_output
+stone_axe_datacenter,populationScienceMultiplier,population,0.03,population_science
+age_of_reform,reformSpeedMultiplier,*,0.03,reform_speed
+three_crowns,nationPreparationSpeedMultiplier,*,0.03,nation_preparation

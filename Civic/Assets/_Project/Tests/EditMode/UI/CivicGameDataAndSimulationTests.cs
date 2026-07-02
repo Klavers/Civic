@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using System.Linq;
+using Civic.Features;
 using Civic.Simulation;
+using Civic.Simulation.Modules;
 using NUnit.Framework;
 using UnityEditor;
 
@@ -126,6 +128,65 @@ namespace Civic.UI.Tests
         }
 
         [Test]
+        public void DebugGrantUnlockedResources_AddsOnlyCurrentlyUnlockedStoredResources()
+        {
+            var data = LoadDefaultData();
+            var simulation = new CivicGameSimulation(data);
+            var locked = data.Resources.First(resource =>
+                resource.Category == ResourceCategory.Element &&
+                !string.IsNullOrEmpty(resource.RequiredTechnologyId) &&
+                !simulation.State.ResearchedTechnologyIds.Contains(resource.RequiredTechnologyId));
+            var wheatBefore = simulation.State.Resources["wheat"];
+            var lockedBefore = simulation.State.Resources[locked.Id];
+
+            var granted = simulation.DebugGrantUnlockedResources(CivicNumber.FromDouble(9999d));
+
+            Assert.That(granted, Is.GreaterThan(0));
+            Assert.That(simulation.State.Resources["wheat"], Is.EqualTo(wheatBefore + CivicNumber.FromDouble(9999d)));
+            Assert.That(simulation.State.Resources[locked.Id], Is.EqualTo(lockedBefore));
+            Assert.That(simulation.Snapshot.Resources.Any(resource => resource.Id == locked.Id), Is.False);
+        }
+
+        [Test]
+        public void DebugResearchAllTechnologies_ResearchesEveryTechnologyAndAdvancesToLatestEra()
+        {
+            var data = LoadDefaultData();
+            var simulation = new CivicGameSimulation(data);
+
+            var researched = simulation.DebugResearchAllTechnologies();
+
+            Assert.That(researched, Is.EqualTo(data.Technologies.Count - data.InitialState.Technologies.Count));
+            Assert.That(simulation.State.ResearchedTechnologyIds, Is.EquivalentTo(data.Technologies.Select(item => item.Id)));
+            Assert.That(simulation.Snapshot.CurrentEraId, Is.EqualTo(data.Eras.OrderByDescending(item => item.Order).First().Id));
+        }
+
+        [Test]
+        public void NationModifierSummary_AggregatesRuntimeSourcesAndIncludesResearchedTechnologyEffects()
+        {
+            var data = LoadDefaultData();
+            var simulation = new CivicGameSimulation(data);
+            var runtime = new CivicModuleRuntime(simulation, CivicFeatureResolver.Resolve(System.Array.Empty<string>()));
+            simulation.GrantTechnology(data.TechnologyEffects.First(effect => effect.EffectType != TechnologyEffectType.PlannedFollowUp).TechnologyId);
+            simulation.Modifiers.Add(new CivicModifierEntry("nation", "test_nation", CivicModifierEffectTypes.ResourceOutputMultiplier, "wheat", 0.10d));
+            simulation.Modifiers.Add(new CivicModifierEntry("person", "test_person", CivicModifierEffectTypes.ResourceOutputMultiplier, "wheat", 0.05d));
+            simulation.Modifiers.Add(new CivicModifierEntry("wonder", "test_wonder", CivicModifierEffectTypes.ResourceOutputMultiplier, "wood", 0.20d));
+
+            var summaries = CivicNationModifierSummaryBuilder.Build(runtime);
+            var groups = CivicNationModifierSummaryBuilder.BuildGroups(runtime);
+            var wheat = summaries.Single(item => item.EffectType == CivicModifierEffectTypes.ResourceOutputMultiplier && item.TargetId == "wheat");
+            var outputGroup = groups.Single(item => item.EffectType == CivicModifierEffectTypes.ResourceOutputMultiplier);
+
+            Assert.That(wheat.Amount, Is.EqualTo(0.15d).Within(1e-9d));
+            Assert.That(wheat.Contributions.Count, Is.EqualTo(2));
+            Assert.That(wheat.TargetName, Is.EqualTo("밀"));
+            Assert.That(outputGroup.Targets.Count, Is.EqualTo(2));
+            Assert.That(outputGroup.ContributionCount, Is.EqualTo(3));
+            Assert.That(outputGroup.Targets.Sum(target => target.Amount), Is.EqualTo(0.35d).Within(1e-9d));
+            Assert.That(summaries.Any(item => item.Contributions.Any(contribution => contribution.SourceType == "technology")), Is.True);
+            Assert.That(CivicNationModifierSummaryBuilder.CurrentNationName(runtime), Is.EqualTo("국가 설립 모듈 비활성"));
+        }
+
+        [Test]
         public void ResearchUnlocksResourcesAndBuildingsForSnapshot()
         {
             var simulation = new CivicGameSimulation(LoadDefaultData());
@@ -212,7 +273,7 @@ namespace Civic.UI.Tests
             simulation.State.Resources["tools"] = CivicNumber.FromDouble(80d);
             simulation.State.ResearchedTechnologyIds.Add("stone_toolmaking");
 
-            simulation.Advance(0.1d);
+            simulation.RefreshSnapshot();
 
             Assert.That(simulation.Snapshot.Population.ToDouble(), Is.EqualTo(380d).Within(0.0001d));
             Assert.That(
@@ -232,7 +293,7 @@ namespace Civic.UI.Tests
             simulation.State.Resources["wheat"] = CivicNumber.FromDouble(100d);
             simulation.State.Resources["wood"] = CivicNumber.FromDouble(100d);
             simulation.State.Resources["tools"] = CivicNumber.FromDouble(100d);
-            simulation.Advance(0.1d);
+            simulation.RefreshSnapshot();
 
             Assert.That(simulation.Snapshot.Population.ToDouble(), Is.EqualTo(403d).Within(0.0001d));
         }
@@ -297,7 +358,7 @@ namespace Civic.UI.Tests
             simulation.State.Buildings["wheat_farm"] = 1;
             simulation.State.ResearchedTechnologyIds.Add("storage_methods");
 
-            simulation.Advance(0.1d);
+            simulation.RefreshSnapshot();
 
             var wheat = Resource(simulation.Snapshot, "wheat");
             Assert.That(wheat.ProducedPerSecond.ToDouble(), Is.EqualTo(2d).Within(0.0001d));
@@ -317,7 +378,7 @@ namespace Civic.UI.Tests
             simulation.State.Resources["wood"] = CivicNumber.FromDouble(100d);
             simulation.State.Resources["stone"] = CivicNumber.FromDouble(100d);
 
-            simulation.Advance(0.1d);
+            simulation.RefreshSnapshot();
 
             var tools = Resource(simulation.Snapshot, "tools");
             var stone = Resource(simulation.Snapshot, "stone");
@@ -337,7 +398,7 @@ namespace Civic.UI.Tests
             simulation.State.Resources["wood"] = CivicNumber.Zero;
             simulation.State.ResearchedTechnologyIds.Add("urban_planning");
 
-            simulation.Advance(0.1d);
+            simulation.RefreshSnapshot();
 
             Assert.That(simulation.Snapshot.Population.ToDouble(), Is.EqualTo(5d).Within(0.0001d));
             Assert.That(Resource(simulation.Snapshot, "population").Producers.Any(flow => flow.BuildingDisplayNameKo.Contains("도시 계획")), Is.True);
@@ -351,6 +412,18 @@ namespace Civic.UI.Tests
 
             Assert.That(powerGrid.EffectSummary, Does.Contain("후속 구현 예정"));
             Assert.That(LoadDefaultData().TechnologyEffects.Single(effect => effect.TechnologyId == "power_grid").EffectType, Is.EqualTo(TechnologyEffectType.PlannedFollowUp));
+        }
+
+        [Test]
+        public void TechnologyEffectSummariesArePrecomputedAndReusedAcrossSnapshots()
+        {
+            var simulation = new CivicGameSimulation(LoadDefaultData());
+            var before = simulation.Snapshot.Technologies.Single(technology => technology.Id == "power_grid").EffectSummary;
+
+            simulation.Advance(1d);
+
+            var after = simulation.Snapshot.Technologies.Single(technology => technology.Id == "power_grid").EffectSummary;
+            Assert.That(ReferenceEquals(before, after), Is.True);
         }
 
         [Test]
@@ -385,7 +458,7 @@ namespace Civic.UI.Tests
             simulation.State.BasePopulation = CivicNumber.FromDouble(27.000000000000007d);
             simulation.State.Resources["construction_power"] = CivicNumber.FromDouble(100d);
             simulation.State.Buildings["logging_camp"] = 27;
-            simulation.Advance(0.1d);
+            simulation.RefreshSnapshot();
 
             Assert.That(simulation.Snapshot.Population.ToDouble(), Is.EqualTo(27d).Within(0.0001d));
             Assert.That(simulation.Snapshot.UsedPopulation.ToDouble(), Is.EqualTo(27d).Within(0.0001d));

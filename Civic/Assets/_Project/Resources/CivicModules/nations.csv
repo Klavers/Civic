@@ -1,0 +1,16 @@
+id,displayNameKo,conceptId,tier,preparationSeconds,treasuryCost,secret,requiredFeatureIds,descriptionKo
+arpadel_aqueduct_kingdom,아르파델 수로왕국,successor,1,90,0,false,identity.startCivilizations,아르파델 농경 경제를 수로 왕국으로 조직
+thalassa_maritime_republic,탈라사 해양공화국,successor,1,60,0,false,identity.startCivilizations,가공품 흑자를 기반으로 한 해양 공화국
+braka_mountain_federation,브라카 산악연방,successor,1,60,0,false,identity.startCivilizations;people.greatPeople,광산과 석재를 기반으로 한 산악 연방
+steam_commonwealth,증기 공동체,technology,1,60,0,false,,증기기관과 공장제를 기반으로 한 산업 국가
+electric_union,전력 연합,technology,1,120,0,false,,구리 공급과 전력 기술을 기반으로 한 연합
+data_technocracy,데이터 기술국,technology,1,60,0,false,narrative.events,정보 기술과 학교 중심 기술 국가
+metropolitan_league,대도시 동맹,urban,1,60,0,false,,고밀도 인구와 주거 기반 도시 국가
+frontier_federation,변경 개척연방,urban,1,60,0,false,identity.startCivilizations,다품종 생산과 재배치를 중시하는 개척 연방
+welfare_civic_republic,복지 시민공화국,urban,1,180,0,false,governance.politics,복지와 공교육을 기반으로 한 시민 공화국
+granary_empire,곡창 제국,economic,1,60,0,false,,식량 GDP와 대규모 비축을 기반으로 한 제국
+black_coal_syndicate,검은석탄 조합국,economic,1,60,0,false,narrative.events,석탄 산업과 오염 사건을 감수하는 조합국
+golden_ledger_league,황금장부 상업연맹,economic,1,60,0,false,,귀금속과 재정 건전성을 기반으로 한 상업연맹
+constitutional_kingdom,입헌 왕국,political,1,60,0,false,governance.politics;narrative.events,군주정과 의회제를 결합한 입헌 국가
+workers_council_state,노동자 평의국,political,1,60,0,false,governance.politics;narrative.events,노동 위기를 평의회 체제로 전환한 국가
+secret_star_successor,잊힌 별의 계승국,secret,2,60,0,true,progress.achievements;narrative.events;projects.wonders,여러 런의 비밀 기록을 결합한 계승국

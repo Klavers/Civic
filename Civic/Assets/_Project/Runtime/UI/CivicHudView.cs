@@ -39,12 +39,16 @@ namespace Civic.UI
         [SerializeField] private Text rightResourcesLabel;
         [SerializeField] private Text detailTitleLabel;
         [SerializeField] private Text detailBodyLabel;
+        [SerializeField] private GameObject detailPanelRoot;
+        [SerializeField] private Button detailCloseButton;
         [SerializeField] private GameObject resourceDetailPanel;
         [SerializeField] private GameObject buildingDetailPanel;
         [SerializeField] private GameObject technologyDetailPanel;
+        [SerializeField] private GameObject nationDetailPanel;
         [SerializeField] private Button resourcesPanelButton;
         [SerializeField] private Button buildingsPanelButton;
         [SerializeField] private Button technologiesPanelButton;
+        [SerializeField] private Button nationPanelButton;
         [SerializeField] private GameObject[] resourceDetailRows;
         [SerializeField] private Text[] resourceSummaryLabels;
         [SerializeField] private GameObject[] resourceProducerBoxes;
@@ -65,16 +69,29 @@ namespace Civic.UI
         [SerializeField] private GameObject[] technologyActionRows;
         [SerializeField] private Text[] technologyActionInfoLabels;
         [SerializeField] private Button[] technologyActionButtons;
+        [SerializeField] private Text nationStatusLabel;
+        [SerializeField] private GameObject[] nationModifierRows;
+        [SerializeField] private Text[] nationModifierSummaryLabels;
+        [SerializeField] private GameObject[] nationModifierDetailRoots;
+        [SerializeField] private Text[] nationModifierDetailLabels;
+        [SerializeField] private Button[] nationModifierExpandButtons;
+        [SerializeField] private Text[] nationModifierExpandLabels;
+        [SerializeField] private LayoutElement[] nationModifierLayouts;
         [SerializeField] private Button foodToggleButton;
         [SerializeField] private CivicTooltipView tooltipView;
 
         private string[] currentBuildingActionIds = Array.Empty<string>();
         private string[] currentEraTabIds = Array.Empty<string>();
         private string[] currentTechnologyActionIds = Array.Empty<string>();
+        private IReadOnlyList<CivicNationModifierGroup> currentNationModifiers = Array.Empty<CivicNationModifierGroup>();
+        private string currentNationName = string.Empty;
+        private readonly HashSet<string> expandedNationModifierKeys = new HashSet<string>(StringComparer.Ordinal);
 
         public event Action ResourcesPanelRequested;
         public event Action BuildingsPanelRequested;
         public event Action TechnologiesPanelRequested;
+        public event Action NationPanelRequested;
+        public event Action DetailPanelCloseRequested;
         public event Action<string> BuildRequested;
         public event Action<string> ResearchRequested;
         public event Action<string> EraTabRequested;
@@ -94,16 +111,21 @@ namespace Civic.UI
             rightResourcesLabel != null &&
             detailTitleLabel != null &&
             detailBodyLabel != null &&
+            detailPanelRoot != null &&
+            detailCloseButton != null &&
             resourceDetailPanel != null &&
             buildingDetailPanel != null &&
             technologyDetailPanel != null &&
+            nationDetailPanel != null &&
             resourcesPanelButton != null &&
             buildingsPanelButton != null &&
             technologiesPanelButton != null &&
+            nationPanelButton != null &&
             HasResourceRows() &&
             HasBuildingRows() &&
             HasActionRows(eraTabRows, eraTabLabels, eraTabButtons) &&
             HasActionRows(technologyActionRows, technologyActionInfoLabels, technologyActionButtons) &&
+            HasNationModifierRows() &&
             foodToggleButton != null &&
             tooltipView != null &&
             tooltipView.HasRequiredReferences;
@@ -111,6 +133,9 @@ namespace Civic.UI
         public Button ResourcesPanelButton => resourcesPanelButton;
         public Button BuildingsPanelButton => buildingsPanelButton;
         public Button TechnologiesPanelButton => technologiesPanelButton;
+        public Button NationPanelButton => nationPanelButton;
+        public GameObject DetailPanelRoot => detailPanelRoot;
+        public Button DetailCloseButton => detailCloseButton;
         public IReadOnlyList<GameObject> ResourceDetailRows => resourceDetailRows ?? Array.Empty<GameObject>();
         public IReadOnlyList<Text> ResourceSummaryLabels => resourceSummaryLabels ?? Array.Empty<Text>();
         public IReadOnlyList<GameObject> ResourceProducerBoxes => resourceProducerBoxes ?? Array.Empty<GameObject>();
@@ -131,6 +156,13 @@ namespace Civic.UI
         public IReadOnlyList<GameObject> TechnologyActionRows => technologyActionRows ?? Array.Empty<GameObject>();
         public IReadOnlyList<Text> TechnologyActionInfoLabels => technologyActionInfoLabels ?? Array.Empty<Text>();
         public IReadOnlyList<Button> TechnologyActionButtons => technologyActionButtons ?? Array.Empty<Button>();
+        public GameObject NationDetailPanel => nationDetailPanel;
+        public Text NationStatusLabel => nationStatusLabel;
+        public IReadOnlyList<GameObject> NationModifierRows => nationModifierRows ?? Array.Empty<GameObject>();
+        public IReadOnlyList<Button> NationModifierExpandButtons => nationModifierExpandButtons ?? Array.Empty<Button>();
+        public IReadOnlyList<GameObject> NationModifierDetailRoots => nationModifierDetailRoots ?? Array.Empty<GameObject>();
+        public IReadOnlyList<Text> NationModifierDetailLabels => nationModifierDetailLabels ?? Array.Empty<Text>();
+        public IReadOnlyList<LayoutElement> NationModifierLayouts => nationModifierLayouts ?? Array.Empty<LayoutElement>();
         public Button FoodToggleButton => foodToggleButton;
         public CivicTooltipView TooltipView => tooltipView;
 
@@ -139,6 +171,8 @@ namespace Civic.UI
             resourcesPanelButton?.onClick.AddListener(NotifyResourcesPanelRequested);
             buildingsPanelButton?.onClick.AddListener(NotifyBuildingsPanelRequested);
             technologiesPanelButton?.onClick.AddListener(NotifyTechnologiesPanelRequested);
+            nationPanelButton?.onClick.AddListener(NotifyNationPanelRequested);
+            detailCloseButton?.onClick.AddListener(NotifyDetailPanelCloseRequested);
             foodToggleButton?.onClick.AddListener(NotifyFoodToggleRequested);
             BindActionButtons();
         }
@@ -148,14 +182,23 @@ namespace Civic.UI
             resourcesPanelButton?.onClick.RemoveListener(NotifyResourcesPanelRequested);
             buildingsPanelButton?.onClick.RemoveListener(NotifyBuildingsPanelRequested);
             technologiesPanelButton?.onClick.RemoveListener(NotifyTechnologiesPanelRequested);
+            nationPanelButton?.onClick.RemoveListener(NotifyNationPanelRequested);
+            detailCloseButton?.onClick.RemoveListener(NotifyDetailPanelCloseRequested);
             foodToggleButton?.onClick.RemoveListener(NotifyFoodToggleRequested);
             ClearActionButtons(buildingActionButtons);
             ClearActionButtons(eraTabButtons);
             ClearActionButtons(technologyActionButtons);
+            ClearActionButtons(nationModifierExpandButtons);
             tooltipView?.Hide();
         }
 
-        public void Render(CivicGameSnapshot snapshot, CivicHudPanelMode panelMode, bool showFoodChildren, string selectedTechnologyEraId)
+        public void Render(
+            CivicGameSnapshot snapshot,
+            CivicHudPanelMode panelMode,
+            bool showFoodChildren,
+            string selectedTechnologyEraId,
+            IReadOnlyList<CivicNationModifierGroup> nationModifiers,
+            string currentNationName)
         {
             if (snapshot == null)
             {
@@ -179,7 +222,7 @@ namespace Civic.UI
             constructionAlertLabel.text = snapshot.HasConstructionBlocked ? "건설 불가" : "건설 가능";
             rightResourcesLabel.supportRichText = true;
             rightResourcesLabel.text = BuildRightResourceText(snapshot, showFoodChildren);
-            RenderDetail(snapshot, panelMode, selectedTechnologyEraId);
+            RenderDetail(snapshot, panelMode, selectedTechnologyEraId, nationModifiers, currentNationName);
         }
 
         private static string BuildRightResourceText(CivicGameSnapshot snapshot, bool showFoodChildren)
@@ -211,12 +254,19 @@ namespace Civic.UI
             return resource.FoodConversion > 0d;
         }
 
-        private void RenderDetail(CivicGameSnapshot snapshot, CivicHudPanelMode panelMode, string selectedTechnologyEraId)
+        private void RenderDetail(
+            CivicGameSnapshot snapshot,
+            CivicHudPanelMode panelMode,
+            string selectedTechnologyEraId,
+            IReadOnlyList<CivicNationModifierGroup> nationModifiers,
+            string currentNationName)
         {
+            detailPanelRoot.SetActive(panelMode != CivicHudPanelMode.None);
             detailBodyLabel.gameObject.SetActive(false);
             resourceDetailPanel.SetActive(panelMode == CivicHudPanelMode.Resources);
             buildingDetailPanel.SetActive(panelMode == CivicHudPanelMode.Buildings);
             technologyDetailPanel.SetActive(panelMode == CivicHudPanelMode.Technologies);
+            nationDetailPanel.SetActive(panelMode == CivicHudPanelMode.Nation);
 
             switch (panelMode)
             {
@@ -226,6 +276,7 @@ namespace Civic.UI
                     RenderBuildingActionButtons(snapshot, false);
                     RenderEraTabs(snapshot, false, selectedTechnologyEraId);
                     RenderTechnologyActionButtons(snapshot, false, selectedTechnologyEraId);
+                    RenderNationModifierRows(null, string.Empty);
                     break;
                 case CivicHudPanelMode.Buildings:
                     detailTitleLabel.text = "건물";
@@ -233,6 +284,7 @@ namespace Civic.UI
                     RenderBuildingActionButtons(snapshot, true);
                     RenderEraTabs(snapshot, false, selectedTechnologyEraId);
                     RenderTechnologyActionButtons(snapshot, false, selectedTechnologyEraId);
+                    RenderNationModifierRows(null, string.Empty);
                     break;
                 case CivicHudPanelMode.Technologies:
                     detailTitleLabel.text = "기술";
@@ -240,6 +292,22 @@ namespace Civic.UI
                     RenderBuildingActionButtons(snapshot, false);
                     RenderEraTabs(snapshot, true, selectedTechnologyEraId);
                     RenderTechnologyActionButtons(snapshot, true, selectedTechnologyEraId);
+                    RenderNationModifierRows(null, string.Empty);
+                    break;
+                case CivicHudPanelMode.Nation:
+                    detailTitleLabel.text = "국가";
+                    RenderResourceDetailRows(null);
+                    RenderBuildingActionButtons(snapshot, false);
+                    RenderEraTabs(snapshot, false, selectedTechnologyEraId);
+                    RenderTechnologyActionButtons(snapshot, false, selectedTechnologyEraId);
+                    RenderNationModifierRows(nationModifiers, currentNationName);
+                    break;
+                case CivicHudPanelMode.None:
+                    RenderResourceDetailRows(null);
+                    RenderBuildingActionButtons(snapshot, false);
+                    RenderEraTabs(snapshot, false, selectedTechnologyEraId);
+                    RenderTechnologyActionButtons(snapshot, false, selectedTechnologyEraId);
+                    RenderNationModifierRows(null, string.Empty);
                     break;
                 default:
                     detailTitleLabel.text = "자원 상세";
@@ -247,7 +315,74 @@ namespace Civic.UI
                     RenderBuildingActionButtons(snapshot, false);
                     RenderEraTabs(snapshot, false, selectedTechnologyEraId);
                     RenderTechnologyActionButtons(snapshot, false, selectedTechnologyEraId);
+                    RenderNationModifierRows(null, string.Empty);
                     break;
+            }
+        }
+
+        private void RenderNationModifierRows(IReadOnlyList<CivicNationModifierGroup> modifiers, string nationName)
+        {
+            currentNationModifiers = modifiers ?? Array.Empty<CivicNationModifierGroup>();
+            currentNationName = nationName ?? string.Empty;
+            nationStatusLabel.text = "현재 국가: " + (string.IsNullOrEmpty(currentNationName) ? "설립된 국가 없음" : currentNationName) +
+                $" · modifier 그룹 {currentNationModifiers.Count}개 · 대상 {currentNationModifiers.Sum(group => group.Targets.Count)}개";
+            for (var index = 0; index < NationModifierRows.Count; index++)
+            {
+                var visible = index < currentNationModifiers.Count;
+                NationModifierRows[index].SetActive(visible);
+                if (!visible) continue;
+                var group = currentNationModifiers[index];
+                var expanded = expandedNationModifierKeys.Contains(group.Key);
+                nationModifierSummaryLabels[index].text = group.Targets.Count == 1
+                    ? $"{group.EffectName} · {group.Targets[0].TargetName} · {FormatModifierAmount(group.EffectType, group.Targets[0].Amount)}"
+                    : $"{group.EffectName} · {group.Targets.Count}개 대상 · {group.ContributionCount}개 출처";
+                nationModifierDetailLabels[index].text = BuildNationModifierGroupDetail(group);
+                nationModifierDetailRoots[index].SetActive(expanded);
+                nationModifierExpandLabels[index].text = expanded ? "−" : "+";
+                var detailHeight = Math.Max(24f, nationModifierDetailLabels[index].preferredHeight + 16f);
+                nationModifierLayouts[index].preferredHeight = expanded
+                    ? 60f + detailHeight
+                    : 52f;
+            }
+
+            var content = NationModifierRows.FirstOrDefault()?.transform.parent as RectTransform;
+            if (content != null) LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+        }
+
+        private static string BuildNationModifierGroupDetail(CivicNationModifierGroup group)
+        {
+            var lines = new List<string>();
+            foreach (var target in group.Targets)
+            {
+                lines.Add($"{target.TargetName}: {FormatModifierAmount(target.EffectType, target.Amount)}");
+                lines.AddRange(target.Contributions.Select(contribution =>
+                    $"  {SourceTypeName(contribution.SourceType)} · {contribution.SourceName}: {FormatModifierAmount(target.EffectType, contribution.Amount)}"));
+            }
+            return string.Join("\n", lines);
+        }
+
+        private static string FormatModifierAmount(string effectType, double amount)
+        {
+            var percent = effectType.EndsWith("Multiplier", StringComparison.Ordinal) || effectType == CivicModifierEffectTypes.TaxRateAdd;
+            return percent ? $"{amount:+0.##%;-0.##%;0%}" : $"{amount:+0.##;-0.##;0}";
+        }
+
+        private static string SourceTypeName(string sourceType)
+        {
+            switch (sourceType)
+            {
+                case "technology": return "기술";
+                case "civilization": return "시작 문명";
+                case "nation": return "국가";
+                case "institution": return "정치·사회체계";
+                case "wonder": return "불가사의";
+                case "person": return "위인 직책";
+                case "personAbility": return "위인 능력";
+                case "personLegacy": return "위인 유산";
+                case "event": return "이벤트";
+                case "achievement": return "도전과제";
+                case "legacy": return "환생 유산";
+                default: return sourceType;
             }
         }
 
@@ -940,6 +1075,24 @@ namespace Civic.UI
                 rows.Length == buttons.Length;
         }
 
+        private bool HasNationModifierRows()
+        {
+            return nationStatusLabel != null &&
+                HasSlots(nationModifierRows) &&
+                HasSlots(nationModifierSummaryLabels) &&
+                HasSlots(nationModifierDetailRoots) &&
+                HasSlots(nationModifierDetailLabels) &&
+                HasSlots(nationModifierExpandButtons) &&
+                HasSlots(nationModifierExpandLabels) &&
+                HasSlots(nationModifierLayouts) &&
+                nationModifierRows.Length == nationModifierSummaryLabels.Length &&
+                nationModifierRows.Length == nationModifierDetailRoots.Length &&
+                nationModifierRows.Length == nationModifierDetailLabels.Length &&
+                nationModifierRows.Length == nationModifierExpandButtons.Length &&
+                nationModifierRows.Length == nationModifierExpandLabels.Length &&
+                nationModifierRows.Length == nationModifierLayouts.Length;
+        }
+
         private static bool HasSlots<T>(T[] values) where T : UnityEngine.Object
         {
             return values != null && values.Length > 0 && values.All(value => value != null);
@@ -964,6 +1117,12 @@ namespace Civic.UI
             {
                 var capturedIndex = index;
                 TechnologyActionButtons[index]?.onClick.AddListener(() => NotifyResearchRequested(capturedIndex));
+            }
+
+            for (var index = 0; index < NationModifierExpandButtons.Count; index++)
+            {
+                var capturedIndex = index;
+                NationModifierExpandButtons[index]?.onClick.AddListener(() => ToggleNationModifierDetail(capturedIndex));
             }
         }
 
@@ -1001,6 +1160,16 @@ namespace Civic.UI
         private void NotifyResourcesPanelRequested() => ResourcesPanelRequested?.Invoke();
         private void NotifyBuildingsPanelRequested() => BuildingsPanelRequested?.Invoke();
         private void NotifyTechnologiesPanelRequested() => TechnologiesPanelRequested?.Invoke();
+        private void NotifyNationPanelRequested() => NationPanelRequested?.Invoke();
+        private void NotifyDetailPanelCloseRequested() => DetailPanelCloseRequested?.Invoke();
+
+        private void ToggleNationModifierDetail(int index)
+        {
+            if (index < 0 || index >= currentNationModifiers.Count) return;
+            var key = currentNationModifiers[index].Key;
+            if (!expandedNationModifierKeys.Add(key)) expandedNationModifierKeys.Remove(key);
+            RenderNationModifierRows(currentNationModifiers, currentNationName);
+        }
         private void NotifyBuildRequested(int index)
         {
             if (index >= 0 && index < currentBuildingActionIds.Length && !string.IsNullOrEmpty(currentBuildingActionIds[index]))
@@ -1063,8 +1232,10 @@ namespace Civic.UI
 
     public enum CivicHudPanelMode
     {
+        None,
         Resources,
         Buildings,
         Technologies,
+        Nation,
     }
 }
