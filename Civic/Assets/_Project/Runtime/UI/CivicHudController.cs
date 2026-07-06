@@ -34,6 +34,7 @@ namespace Civic.UI
         private bool prestigeConfirmationPending;
         private string lastAutoOpenedEventId = string.Empty;
         private bool debugInstantActionsEnabled;
+        private CivicBuildQuantityMode buildQuantityMode = CivicBuildQuantityMode.One;
         private IReadOnlyList<CivicNationModifierGroup> nationModifierSummaries = Array.Empty<CivicNationModifierGroup>();
         private int nationModifierRevision = -1;
         private int nationTechnologyCount = -1;
@@ -50,6 +51,7 @@ namespace Civic.UI
         public CivicModulePanelView ModulePanelView => modulePanelView;
         public CivicHudOverlayView OverlayView => overlayView;
         public CivicHudPanelMode PanelMode => panelMode;
+        public CivicBuildQuantityMode BuildQuantityMode => buildQuantityMode;
         public bool HasRequiredReferences => view != null && dataSource != null && modulePanelView != null && modulePanelView.HasRequiredReferences && overlayView != null && overlayView.HasRequiredReferences;
 
         private void Awake()
@@ -76,6 +78,7 @@ namespace Civic.UI
             view.NationPanelRequested += ShowNationPanel;
             view.DetailPanelCloseRequested += CloseDetailPanel;
             view.BuildRequested += BuildRequestedBuilding;
+            view.BuildQuantityRequested += SelectBuildQuantity;
             view.ResearchRequested += ResearchRequestedTechnology;
             view.EraTabRequested += SelectTechnologyEra;
             view.FoodToggleRequested += ToggleFoodChildren;
@@ -109,6 +112,7 @@ namespace Civic.UI
             view.NationPanelRequested -= ShowNationPanel;
             view.DetailPanelCloseRequested -= CloseDetailPanel;
             view.BuildRequested -= BuildRequestedBuilding;
+            view.BuildQuantityRequested -= SelectBuildQuantity;
             view.ResearchRequested -= ResearchRequestedTechnology;
             view.EraTabRequested -= SelectTechnologyEra;
             view.FoodToggleRequested -= ToggleFoodChildren;
@@ -176,7 +180,10 @@ namespace Civic.UI
             {
                 EnsureSelectedTechnologyEra(simulation.Snapshot);
                 EnsureNationModifierSummary();
-                view.Render(simulation.Snapshot, panelMode, showFoodChildren, selectedTechnologyEraId, nationModifierSummaries, nationSummaryName);
+                var buildQuotes = simulation.Snapshot.Buildings
+                    .Where(building => building.IsBuildable)
+                    .ToDictionary(building => building.Id, building => simulation.PreviewBuild(building.Id, buildQuantityMode));
+                view.Render(simulation.Snapshot, panelMode, showFoodChildren, selectedTechnologyEraId, nationModifierSummaries, nationSummaryName, buildQuantityMode, buildQuotes);
                 lastRenderedSnapshot = simulation.Snapshot;
             }
         }
@@ -212,6 +219,7 @@ namespace Civic.UI
 
         public void ProcessEscape()
         {
+            if (view?.TooltipView != null && view.TooltipView.TryDismissPinned()) return;
             if (overlayView.IsEventPopupOpen)
             {
                 CloseEventPopup();
@@ -273,10 +281,12 @@ namespace Civic.UI
 
         private void ShowEventPopup(CivicQueuedEventSnapshot queued, CivicEventModule events)
         {
-            modulePanelView.ClosePanel();
-            panelMode = CivicHudPanelMode.None;
             overlayView.HideExitPopup();
-            overlayView.ShowEvent(queued, choice => events.IsChoiceAvailable(choice.Id), choice => events.DescribeChoice(choice.Id));
+            overlayView.ShowEvent(
+                queued,
+                choice => events.IsChoiceAvailable(choice.Id),
+                choice => events.DescribeChoiceSummary(choice.Id),
+                choice => events.DescribeChoice(choice.Id));
         }
 
         private void CloseEventPopup() => overlayView.HideEventPopup();
@@ -536,8 +546,14 @@ namespace Civic.UI
 
         private void BuildRequestedBuilding(string buildingId)
         {
-            moduleRuntime?.TryBuild(buildingId);
+            moduleRuntime?.TryBuildBatch(buildingId, buildQuantityMode, out _);
 
+            Render();
+        }
+
+        private void SelectBuildQuantity(CivicBuildQuantityMode mode)
+        {
+            buildQuantityMode = mode;
             Render();
         }
 

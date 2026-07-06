@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Civic.Features;
+using Civic.Simulation;
 using Civic.Simulation.Modules;
 using UnityEngine;
 using UnityEngine.Events;
@@ -322,7 +323,8 @@ namespace Civic.UI
                 var canAfford = !atMaximum && cost > 0 && runtime.MetaProgress.PrestigePoints >= cost;
                 var action = atMaximum ? "최대" : $"구매 {cost}P";
                 var tooltip = atMaximum ? "최대 단계입니다." : canAfford ? "구매 효과는 다음 런부터 적용됩니다." : "환생 포인트가 부족합니다.";
-                return new RowEntry(perk.Id, $"{perk.DisplayNameKo} · {rank}/{perk.MaxRank} · {perk.EffectType} {perk.Amount:+0.##;-0.##;0}", action, canAfford, tooltip);
+                var effect = CivicEffectText.Describe(perk.EffectType, perk.TargetId, perk.Amount, 0d, runtime.Simulation.Data);
+                return new RowEntry(perk.Id, $"{perk.DisplayNameKo} · {rank}/{perk.MaxRank} · {effect}", action, canAfford, tooltip);
             }));
             return result;
         }
@@ -564,12 +566,12 @@ namespace Civic.UI
             return result;
         }
 
-        private static string FormatAchievementReward(CivicAchievementRewardDefinition reward)
+        private string FormatAchievementReward(CivicAchievementRewardDefinition reward)
         {
             return FormatEffect(reward.EffectType, reward.TargetId, reward.Amount, 0d);
         }
 
-        private static string FormatPersonAbility(CivicPersonAbilityDefinition ability)
+        private string FormatPersonAbility(CivicPersonAbilityDefinition ability)
         {
             var resolved = ability.Resolve();
             var description = string.IsNullOrWhiteSpace(ability.DescriptionKo) ? string.Empty : " · " + ability.DescriptionKo;
@@ -583,15 +585,15 @@ namespace Civic.UI
                 var alternative = string.IsNullOrEmpty(condition.AlternativeGroup) ? string.Empty : $" [대안 {condition.AlternativeGroup}]";
                 var duration = condition.Duration > 0d ? $" · {condition.Duration:0.#}초 유지" : string.Empty;
                 var forbidden = condition.Forbidden ? "금지 " : string.Empty;
-                return $"{(condition.IsSatisfied ? "✓" : "✕")} {forbidden}{condition.MetricId} {condition.Comparator} {condition.RequiredValue:0.##} · 현재 {condition.CurrentValue:0.##}{alternative}{duration}";
+                var status = CivicLocalizationService.Catalog.Resolve(condition.IsSatisfied ? "condition.status_met" : "condition.status_unmet", null, true);
+                return $"{status} {forbidden}{condition.MetricId} {condition.Comparator} {condition.RequiredValue:0.##} · 현재 {condition.CurrentValue:0.##}{alternative}{duration}";
             }).ToArray();
             return lines.Length == 0 ? "조건 없음" : string.Join("\n", lines);
         }
 
-        private static string FormatEffect(string effectType, string targetId, double amount, double duration)
+        private string FormatEffect(string effectType, string targetId, double amount, double duration)
         {
-            var lifetime = duration > 0d ? $" · {duration:0.#}초" : " · 지속";
-            return $"{effectType}({targetId}) {amount:+0.##;-0.##;0}{lifetime}";
+            return CivicEffectText.Describe(effectType, targetId, amount, duration, runtime?.Simulation?.Data);
         }
 
         private static string NationStateText(CivicNationCandidateState state)

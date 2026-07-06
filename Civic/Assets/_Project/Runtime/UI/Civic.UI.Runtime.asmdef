@@ -5,7 +5,8 @@
     "Civic.Features.Runtime",
     "Civic.Simulation.Runtime",
     "UnityEngine.UI",
-    "Unity.InputSystem"
+    "Unity.InputSystem",
+    "Unity.TextMeshPro"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

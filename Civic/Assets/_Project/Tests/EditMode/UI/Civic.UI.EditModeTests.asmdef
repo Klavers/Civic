@@ -6,7 +6,8 @@
     "Civic.Simulation.Runtime",
     "Civic.UI.Runtime",
     "Civic.UI.Editor",
-    "UnityEngine.UI"
+    "UnityEngine.UI",
+    "Unity.TextMeshPro"
   ],
   "includePlatforms": [
     "Editor"

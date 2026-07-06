@@ -3,6 +3,7 @@ using Civic.Editor.UI;
 using Civic.Features;
 using Civic.Simulation;
 using NUnit.Framework;
+using TMPro;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
@@ -80,6 +81,8 @@ namespace Civic.UI.Tests
             Assert.That(view.BuildingGdpDeltaLabels.Count, Is.EqualTo(expectedBuildingRowCount));
             Assert.That(view.BuildingActionButtons.Count, Is.EqualTo(expectedBuildingRowCount));
             Assert.That(view.BuildingButtonTooltips.Count, Is.EqualTo(expectedBuildingRowCount));
+            Assert.That(view.BuildingQuantityButtons.Count, Is.EqualTo(5));
+            Assert.That(view.BuildingQuantityLabels.Count, Is.EqualTo(5));
             Assert.That(view.EraTabRows.Count, Is.EqualTo(10));
             Assert.That(view.EraTabLabels.Count, Is.EqualTo(10));
             Assert.That(view.EraTabButtons.Count, Is.EqualTo(10));
@@ -100,6 +103,8 @@ namespace Civic.UI.Tests
             Assert.That(view.BuildingGdpDeltaLabels, Has.All.Not.Null);
             Assert.That(view.BuildingActionButtons, Has.All.Not.Null);
             Assert.That(view.BuildingButtonTooltips, Has.All.Not.Null);
+            Assert.That(view.BuildingQuantityButtons, Has.All.Not.Null);
+            Assert.That(view.BuildingQuantityLabels, Has.All.Not.Null);
             Assert.That(view.EraTabRows, Has.All.Not.Null);
             Assert.That(view.EraTabLabels, Has.All.Not.Null);
             Assert.That(view.EraTabButtons, Has.All.Not.Null);
@@ -120,6 +125,21 @@ namespace Civic.UI.Tests
             Assert.That(view.TooltipView, Is.Not.Null);
             Assert.That(view.TooltipView.HasRequiredReferences, Is.True);
             Assert.That(view.TooltipView.DoesNotBlockRaycasts, Is.True);
+            Assert.That(view.TooltipView.Cards.Count, Is.EqualTo(CivicTooltipView.MaximumDepth));
+            Assert.That(view.TooltipView.Cards.All(card => card.BodyLabel != null && card.FooterLabel != null), Is.True);
+            Assert.That(view.TooltipView.PinDelaySeconds, Is.EqualTo(1.5f).Within(0.001f));
+            Assert.That(view.TooltipView.Cards.All(card => card.Outline != null), Is.True);
+            var uiFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(UiPrefabGenerator.UiFontAssetPath);
+            var sourceFont = AssetDatabase.LoadAssetAtPath<Font>(UiPrefabGenerator.UiFontSourcePath);
+            Assert.That(uiFont, Is.Not.Null);
+            Assert.That(uiFont.atlasPopulationMode, Is.EqualTo(AtlasPopulationMode.Dynamic));
+            Assert.That(uiFont.isMultiAtlasTexturesEnabled, Is.True);
+            Assert.That(TMP_Settings.defaultFontAsset, Is.SameAs(uiFont));
+            Assert.That(sourceFont, Is.Not.Null);
+            Assert.That(sourceFont.HasCharacter('\uCD9C'), Is.True);
+            Assert.That(AssetDatabase.LoadMainAssetAtPath(UiPrefabGenerator.UiFontLicensePath), Is.Not.Null);
+            Assert.That(view.TooltipView.Cards.All(card => card.BodyLabel.font == uiFont && card.FooterLabel.font == uiFont), Is.True);
+            Assert.That(overlay.EventChoiceEffectLabels.Count, Is.EqualTo(3));
             Assert.That(
                 PrefabUtility.GetPrefabAssetType(hud),
                 Is.EqualTo(PrefabAssetType.Variant));

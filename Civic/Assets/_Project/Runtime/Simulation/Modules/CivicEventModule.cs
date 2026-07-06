@@ -165,11 +165,23 @@ namespace Civic.Simulation.Modules
         {
             var choice = content.Choices.FirstOrDefault(item => item.Id == choiceId);
             if (choice == null) return string.Empty;
-            var descriptions = content.Effects.Where(item => item.ChoiceId == choiceId).Select(DescribeEffect).ToArray();
+            var descriptions = content.Effects.Where(item => item.ChoiceId == choiceId).Select(item => DescribeEffect(item, true)).ToArray();
             var requirement = string.IsNullOrEmpty(choice.RequirementMetricId)
                 ? string.Empty
                 : $"조건: {choice.RequirementMetricId} {choice.RequirementComparator} {choice.RequirementValue:0.##}";
-            return string.Join("\n", new[] { requirement }.Concat(descriptions).Where(item => !string.IsNullOrWhiteSpace(item)));
+            var source = content.Events.FirstOrDefault(item => item.Id == choice.EventId)?.TitleKo ?? choice.EventId;
+            return string.Join("\n", new[] { "출처: " + source, requirement }.Concat(descriptions).Where(item => !string.IsNullOrWhiteSpace(item)));
+        }
+
+        public string DescribeChoiceSummary(string choiceId)
+        {
+            var descriptions = content.Effects.Where(item => item.ChoiceId == choiceId)
+                .Select(item => DescribeEffect(item, false))
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .ToArray();
+            return descriptions.Length == 0
+                ? CivicLocalizationService.Catalog.Resolve("event.choice.no_effect", null, false)
+                : string.Join(" · ", descriptions);
         }
 
         public bool DebugQueueEvent(string eventId)
@@ -302,12 +314,11 @@ namespace Civic.Simulation.Modules
             return applied;
         }
 
-        private string DescribeEffect(CivicEventEffectDefinition effect) => DescribeResolvedEffect(effect.Resolve());
+        private string DescribeEffect(CivicEventEffectDefinition effect, bool richText = false) => DescribeResolvedEffect(effect.Resolve(), richText);
 
-        private static string DescribeResolvedEffect(CivicResolvedModuleEffect resolved)
+        private string DescribeResolvedEffect(CivicResolvedModuleEffect resolved, bool richText = false)
         {
-            var duration = resolved.Duration > 0d ? $" · {resolved.Duration:0.#}초" : " · 지속";
-            return $"{resolved.EffectType}({resolved.TargetId}) {resolved.Amount:+0.##;-0.##;0}{duration}";
+            return CivicEffectText.Describe(resolved.EffectType, resolved.TargetId, resolved.Amount, resolved.Duration, Context?.Simulation?.Data, richText);
         }
 
         private void ApplyModifier(string eventId, string choiceId, CivicEventEffectDefinition effect, CivicResolvedModuleEffect resolved)

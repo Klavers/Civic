@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Civic.UI;
+using TMPro;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -117,6 +119,7 @@ namespace Civic.Editor.UI
             var view = hud.GetComponent<CivicHudView>();
             var controller = hud.GetComponent<CivicHudController>();
             var modulePanel = hud.GetComponent<CivicModulePanelView>();
+            var overlay = hud.GetComponent<CivicHudOverlayView>();
             if (view == null || !view.HasRequiredReferences)
             {
                 errors.Add("CivicHudView is missing or has unassigned serialized references.");
@@ -132,6 +135,11 @@ namespace Civic.Editor.UI
                 errors.Add("CivicHud module panel is missing or has unassigned serialized references.");
             }
 
+            if (overlay == null || !overlay.HasRequiredReferences || controller == null || controller.OverlayView != overlay)
+            {
+                errors.Add("CivicHud overlay is missing or has unassigned serialized references.");
+            }
+
             if (controller != null && controller.DataSource == null)
             {
                 errors.Add("CivicHudController is missing CivicGameDataSource.");
@@ -140,6 +148,59 @@ namespace Civic.Editor.UI
             if (view != null && (view.BuildingActionRows.Count == 0 || view.EraTabRows.Count == 0 || view.TechnologyActionRows.Count == 0))
             {
                 errors.Add("CivicHudView must have building action row, era tab, and technology action row slots.");
+            }
+
+            if (view != null && view.BuildingQuantityButtons.Count != 5)
+            {
+                errors.Add("CivicHudView must contain 1/5/10/25/Max building quantity buttons.");
+            }
+
+            if (view?.TooltipView != null)
+            {
+                var uiFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(UiPrefabGenerator.UiFontAssetPath);
+                var tooltipCanvas = view.TooltipView.GetComponent<Canvas>();
+                if (tooltipCanvas == null || !tooltipCanvas.overrideSorting || tooltipCanvas.sortingOrder != 200 ||
+                    view.TooltipView.Cards.Count != CivicTooltipView.MaximumDepth ||
+                    !Mathf.Approximately(view.TooltipView.PinDelaySeconds, 1.5f) ||
+                    view.TooltipView.Cards.Any(card => card == null || card.Outline == null))
+                {
+                    errors.Add("Tooltip must use sorting order 200, a 12-card pool, 1.5-second pin delay, and pin-state outlines.");
+                }
+
+                if (uiFont == null ||
+                    uiFont.atlasPopulationMode != AtlasPopulationMode.Dynamic ||
+                    !uiFont.isMultiAtlasTexturesEnabled ||
+                    TMP_Settings.defaultFontAsset != uiFont)
+                {
+                    errors.Add("NanumGothic SDF must be the dynamic multi-atlas TMP default font.");
+                }
+                else if (view.TooltipView.Cards.Any(card =>
+                    card == null || card.BodyLabel == null || card.FooterLabel == null ||
+                    card.BodyLabel.font != uiFont || card.FooterLabel.font != uiFont))
+                {
+                    errors.Add("Every Tooltip card must explicitly use NanumGothic SDF.");
+                }
+            }
+
+            var sourceFont = AssetDatabase.LoadAssetAtPath<Font>(UiPrefabGenerator.UiFontSourcePath);
+            if (sourceFont == null || !sourceFont.HasCharacter('\uCD9C'))
+            {
+                errors.Add("Civic UI font source is missing or does not contain the Korean character U+CD9C.");
+            }
+
+            if (AssetDatabase.LoadMainAssetAtPath(UiPrefabGenerator.UiFontLicensePath) == null)
+            {
+                errors.Add("Nanum font OFL license must be included in StreamingAssets/ThirdPartyNotices.");
+            }
+
+            if (overlay?.EventPopupRoot != null)
+            {
+                var eventCanvas = overlay.EventPopupRoot.GetComponent<Canvas>();
+                var blocker = overlay.EventPopupRoot.GetComponent<Image>();
+                if (eventCanvas == null || !eventCanvas.overrideSorting || eventCanvas.sortingOrder != 100 || blocker == null || !blocker.raycastTarget)
+                {
+                    errors.Add("Event popup must use sorting order 100 and a full-screen raycast blocker.");
+                }
             }
 
             if (view != null &&

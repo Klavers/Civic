@@ -10,6 +10,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Unity.Profiling;
+using UnityEngine.UI;
 using Object = UnityEngine.Object;
 
 namespace Civic.UI.Tests
@@ -369,6 +370,7 @@ namespace Civic.UI.Tests
             Assert.That(recruitedRow.ChoiceTooltips.All(trigger => !string.IsNullOrWhiteSpace(trigger.TooltipText)), Is.True);
             var pointer = new PointerEventData(EventSystem.current) { position = new Vector2(400f, 400f) };
             recruitedRow.ChoiceTooltips[0].OnPointerEnter(pointer);
+            yield return new WaitForSecondsRealtime(0.26f);
             Assert.That(controller.View.TooltipView.IsVisible, Is.True);
             modulePanel.Bind(controller.ModuleRuntime, false);
             Assert.That(controller.View.TooltipView.IsVisible, Is.True, "매 프레임 재바인딩 중에도 직책 tooltip이 유지되어야 한다.");
@@ -384,6 +386,7 @@ namespace Civic.UI.Tests
             Assert.That(occupiedPositionRow.DescriptionLabel.text, Does.Contain(offeredAbilityName));
             Assert.That(occupiedPositionRow.DescriptionLabel.text, Does.Contain("액티브 능력"));
             occupiedPositionRow.ActionTooltip.OnPointerEnter(pointer);
+            yield return new WaitForSecondsRealtime(0.26f);
             Assert.That(controller.View.TooltipView.IsVisible, Is.True);
             modulePanel.Bind(controller.ModuleRuntime, false);
             Assert.That(controller.View.TooltipView.IsVisible, Is.True, "능력 발동 tooltip도 재바인딩 중 유지되어야 한다.");
@@ -400,6 +403,69 @@ namespace Civic.UI.Tests
             modulePanel.ClosePanel();
             yield return null;
             Assert.That(controller.View.TooltipView.IsVisible, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator CivicHud_TooltipSupportsNestedGraceAndPinnedLifecycle()
+        {
+            CivicFeatureRuntime.ConfigureAndBeginForTests(CivicFeatureRegistry.Features.Select(item => item.Id));
+            SceneManager.LoadScene("SampleScene");
+            yield return null;
+            yield return null;
+
+            var controller = Object.FindFirstObjectByType<CivicHudController>();
+            var tooltip = controller.View.TooltipView;
+            var sourceObject = new GameObject("TooltipPinTestSource", typeof(RectTransform), typeof(CivicTooltipTrigger));
+            sourceObject.transform.SetParent(controller.View.transform, false);
+            var trigger = sourceObject.GetComponent<CivicTooltipTrigger>();
+            trigger.AssignTooltipView(tooltip);
+            trigger.SetTooltipText("Tooltip pin lifecycle test");
+            var pointer = new PointerEventData(EventSystem.current) { position = new Vector2(500f, 500f) };
+
+            trigger.OnPointerEnter(pointer);
+            yield return new WaitForSecondsRealtime(0.26f);
+            Assert.That(tooltip.IsVisible, Is.True);
+            yield return new WaitForSecondsRealtime(1.55f);
+            Assert.That(tooltip.IsPinned, Is.True, "같은 Tooltip chain을 1.5초 이상 hover하면 자동 고정되어야 한다.");
+            trigger.OnPointerExit(pointer);
+            yield return new WaitForSecondsRealtime(0.3f);
+            Assert.That(tooltip.IsVisible, Is.True, "고정 Tooltip은 source를 벗어나도 유지되어야 한다.");
+            controller.ProcessEscape();
+            Assert.That(tooltip.IsVisible, Is.False, "ESC는 다른 패널보다 고정 Tooltip을 먼저 닫아야 한다.");
+
+            trigger.OnPointerEnter(pointer);
+            yield return new WaitForSecondsRealtime(0.26f);
+            var middleClick = new PointerEventData(EventSystem.current)
+            {
+                position = pointer.position,
+                button = PointerEventData.InputButton.Middle,
+            };
+            tooltip.Cards[0].OnPointerClick(middleClick);
+            Assert.That(tooltip.IsPinned, Is.True, "가운데 버튼으로 Tooltip을 즉시 고정할 수 있어야 한다.");
+            trigger.OnPointerExit(pointer);
+            tooltip.Cards[0].OnPointerClick(middleClick);
+            yield return new WaitForSecondsRealtime(0.3f);
+            Assert.That(tooltip.IsVisible, Is.False, "가운데 버튼으로 고정을 해제한 뒤 pointer가 밖에 있으면 grace 후 닫혀야 한다.");
+
+            tooltip.Show("<link=\"concept_tax_rate\"><u>세율</u></link>", pointer.position);
+            yield return null;
+            var parent = tooltip.Cards[0];
+            Canvas.ForceUpdateCanvases();
+            parent.BodyLabel.ForceMeshUpdate();
+            var link = parent.BodyLabel.textInfo.linkInfo[0];
+            var character = parent.BodyLabel.textInfo.characterInfo[link.linkTextfirstCharacterIndex];
+            var localCenter = (character.bottomLeft + character.topRight) * 0.5f;
+            pointer.position = RectTransformUtility.WorldToScreenPoint(null, parent.BodyLabel.transform.TransformPoint(localCenter));
+            parent.OnPointerEnter(pointer);
+            parent.OnPointerMove(pointer);
+            yield return new WaitForSecondsRealtime(0.26f);
+            Assert.That(tooltip.Cards[1].gameObject.activeSelf, Is.True);
+            parent.OnPointerExit(pointer);
+            tooltip.Cards[1].OnPointerEnter(pointer);
+            yield return new WaitForSecondsRealtime(0.3f);
+            Assert.That(tooltip.Cards[1].gameObject.activeSelf, Is.True, "부모 link에서 자식 Tooltip으로 이동하는 동안 grace가 자식 카드를 보존해야 한다.");
+            tooltip.Hide();
+            Object.Destroy(sourceObject);
         }
 
         [UnityTest]
@@ -422,9 +488,16 @@ namespace Civic.UI.Tests
             yield return null;
             Assert.That(controller.OverlayView.IsEventPopupOpen, Is.False);
             Assert.That(events.Queue.Count, Is.EqualTo(queueBefore));
+            controller.View.BuildingsPanelButton.onClick.Invoke();
+            yield return null;
+            Assert.That(controller.PanelMode, Is.EqualTo(CivicHudPanelMode.Buildings));
             controller.OverlayView.EventAlertButton.onClick.Invoke();
             yield return null;
             Assert.That(controller.OverlayView.IsEventPopupOpen, Is.True);
+            Assert.That(controller.PanelMode, Is.EqualTo(CivicHudPanelMode.Buildings));
+            Assert.That(controller.OverlayView.EventPopupRoot.GetComponent<Canvas>().sortingOrder, Is.EqualTo(100));
+            Assert.That(controller.View.TooltipView.GetComponent<Canvas>().sortingOrder, Is.EqualTo(200));
+            Assert.That(controller.OverlayView.EventChoiceEffectLabels.Where(label => label.gameObject.activeInHierarchy).All(label => !string.IsNullOrWhiteSpace(label.text)), Is.True);
 
             var historyBefore = events.History.Count;
             var choice = controller.OverlayView.EventChoiceButtons.First(button => button.gameObject.activeSelf && button.interactable);
@@ -432,6 +505,37 @@ namespace Civic.UI.Tests
             yield return null;
             Assert.That(events.History.Count, Is.EqualTo(historyBefore + 1));
             Assert.That(events.History.Last().AppliedResults, Is.Not.Null);
+            Assert.That(controller.PanelMode, Is.EqualTo(CivicHudPanelMode.Buildings));
+        }
+
+        [UnityTest]
+        public IEnumerator CivicHud_BuildQuantityToggleExecutesAtomicBatch()
+        {
+            CivicFeatureRuntime.ResetForMainMenu();
+            SceneManager.LoadScene("SampleScene");
+            yield return null;
+            yield return null;
+
+            var controller = Object.FindFirstObjectByType<CivicHudController>();
+            controller.Simulation.State.BasePopulation = CivicNumber.FromDouble(100d);
+            controller.Simulation.State.Resources["construction_power"] = CivicNumber.FromDouble(1000d);
+            controller.Simulation.RefreshSnapshot();
+            controller.View.BuildingsPanelButton.onClick.Invoke();
+            yield return null;
+            controller.View.BuildingQuantityButtons[1].onClick.Invoke();
+            yield return null;
+
+            Assert.That(controller.BuildQuantityMode, Is.EqualTo(CivicBuildQuantityMode.Five));
+            var index = controller.View.BuildingActionInfoLabels.ToList().FindIndex(label => label.gameObject.activeInHierarchy && label.text == "벌목장");
+            Assert.That(index, Is.GreaterThanOrEqualTo(0));
+            var before = controller.Simulation.State.Buildings["logging_camp"];
+            Assert.That(controller.View.BuildingActionButtons[index].interactable, Is.True);
+            Assert.That(controller.View.BuildingActionButtons[index].GetComponentInChildren<Text>().text, Does.Contain("×5"));
+
+            controller.View.BuildingActionButtons[index].onClick.Invoke();
+            yield return null;
+
+            Assert.That(controller.Simulation.State.Buildings["logging_camp"], Is.EqualTo(before + 5));
         }
 
         [UnityTest]

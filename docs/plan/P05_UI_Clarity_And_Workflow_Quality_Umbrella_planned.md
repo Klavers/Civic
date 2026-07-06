@@ -62,8 +62,11 @@ P05는 다음 이슈를 단일 umbrella에서 관리한다.
 
 ### 4.2 Tooltip 수명주기와 중첩
 
+- Tooltip TMP 기본 글꼴은 `NanumGothic.ttf` 기반 Dynamic·Multi Atlas `NanumGothic SDF`로 고정한다. 원본 OFL 1.1 전문은 `StreamingAssets/ThirdPartyNotices`에 포함하여 빌드 배포본에도 동봉한다.
 - 기존 HUD Text는 유지하고 Tooltip 본문만 `TextMeshProUGUI`로 전환한다.
 - hover 대상에서 포인터가 0.25초간 거의 정지하면 표시하고, 대상·부모·자식 사이 이동에는 0.25초 grace를 둔다.
+- 부모 link에서 자식 Tooltip으로 이동할 때 즉시 닫지 않고 grace 동안 보존한다. 같은 chain을 1.5초 hover하거나 가운데 버튼을 누르면 고정하며, 한 번에 하나의 고정 chain만 유지한다.
+- 고정 준비 중에는 외곽선이 회색에서 금색으로 변하고, 고정 완료 후에는 청색 외곽선을 유지한다. 가운데 버튼 재클릭, Tooltip 우선 ESC, 외부 클릭, 소유 패널 종료, 씬 전환으로 해제한다.
 - 런타임 계층 생성 없이 생성기가 최대 12개의 card pool을 Base Prefab에 만든다.
 - 13단계 진입은 차단하고 현재 Tooltip footer에 `최대 12단계까지 열 수 있습니다`를 표시한다.
 - 장문은 스크롤하지 않고 의미 단위로 나눈 뒤 `설명 계속 보기` hover 링크로 자식 Tooltip을 연다. 반복 목록은 페이지당 최대 10개다.
@@ -111,6 +114,8 @@ P05는 다음 이슈를 단일 umbrella에서 관리한다.
 - [ ] localization parser, FORMAT, concept link, BOM 유무, 누락 key raw fallback을 검증한다.
 - [ ] 기술·모듈·국가 modifier·이벤트 선택지에서 내부 effect ID가 노출되지 않는다.
 - [ ] Tooltip 정지 지연, 이동 grace, owner 비활성화, 12단계 제한, 계속 보기, ellipsis link와 화면 경계를 검증한다.
+- [ ] 부모·자식 이동 grace, 1.5초 자동 고정, 가운데 버튼 고정·해제, 외부 클릭·ESC·패널 종료 해제와 고정 외곽선을 검증한다.
+- [ ] Tooltip 카드와 TMP 기본 설정이 `NanumGothic SDF`를 사용하고 `U+CD9C` 한글 글리프와 OFL 라이선스 동봉을 검증한다.
 - [ ] 이벤트 표시·닫기·선택·재열기에서 좌측 패널·탭 상태가 유지되고 배경 입력이 차단된다.
 - [ ] `1/5/10/25/Max`, 최소 비용 1, 인구 제한, 인구생산 예외, 원자적 batch를 검증한다.
 - [ ] `MainMenu`에 활성 MainCamera와 단일 AudioListener가 존재하고 재생성 시 중복되지 않는다.

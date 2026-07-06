@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Civic.Features;
 using Civic.UI;
 using UnityEditor;
@@ -141,6 +142,16 @@ namespace Civic.Editor.UI
                     errors.Add("MainMenu scene does not instantiate the editable CivicMainMenu Variant.");
                 }
             }
+
+            var cameras = UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .Where(item => item.gameObject.scene == scene && item.enabled && item.gameObject.activeInHierarchy && item.CompareTag("MainCamera"))
+                .ToArray();
+            if (cameras.Length != 1) errors.Add($"MainMenu scene must contain exactly one active MainCamera; found {cameras.Length}.");
+            var listeners = UnityEngine.Object.FindObjectsByType<AudioListener>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .Where(item => item.gameObject.scene == scene && item.enabled && item.gameObject.activeInHierarchy)
+                .ToArray();
+            if (listeners.Length != 1) errors.Add($"MainMenu scene must contain exactly one active AudioListener; found {listeners.Length}.");
+            else if (cameras.Length == 1 && listeners[0].gameObject != cameras[0].gameObject) errors.Add("MainMenu AudioListener must be attached to Main Camera.");
 
             if (!scene.IsValid())
             {

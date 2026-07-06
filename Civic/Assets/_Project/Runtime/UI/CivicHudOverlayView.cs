@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Civic.Simulation.Modules;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace Civic.UI
@@ -21,6 +22,7 @@ namespace Civic.UI
         [SerializeField] private Button eventCloseButton;
         [SerializeField] private Button[] eventChoiceButtons;
         [SerializeField] private Text[] eventChoiceLabels;
+        [SerializeField] private Text[] eventChoiceEffectLabels;
         [SerializeField] private CivicTooltipTrigger[] eventChoiceTooltips;
         [SerializeField] private GameObject debugPanelRoot;
         [SerializeField] private Button debugPreviousDomainButton;
@@ -47,6 +49,7 @@ namespace Civic.UI
         private IReadOnlyList<string> debugTargetLabels = Array.Empty<string>();
         private int debugDomainIndex;
         private int debugTargetIndex;
+        private GameObject selectedBeforeEvent;
 
         public event Action ContinueRequested;
         public event Action MainMenuRequested;
@@ -65,9 +68,9 @@ namespace Civic.UI
             exitPopupRoot != null && continueButton != null && mainMenuButton != null &&
             eventAlertButton != null && eventAlertLabel != null && eventPopupRoot != null &&
             eventTitleLabel != null && eventDescriptionLabel != null && eventCauseLabel != null && eventCloseButton != null &&
-            eventChoiceButtons != null && eventChoiceLabels != null && eventChoiceTooltips != null &&
-            eventChoiceButtons.Length == 3 && eventChoiceLabels.Length == 3 && eventChoiceTooltips.Length == 3 &&
-            eventChoiceButtons.All(item => item != null) && eventChoiceLabels.All(item => item != null) && eventChoiceTooltips.All(item => item != null) &&
+            eventChoiceButtons != null && eventChoiceLabels != null && eventChoiceEffectLabels != null && eventChoiceTooltips != null &&
+            eventChoiceButtons.Length == 3 && eventChoiceLabels.Length == 3 && eventChoiceEffectLabels.Length == 3 && eventChoiceTooltips.Length == 3 &&
+            eventChoiceButtons.All(item => item != null) && eventChoiceLabels.All(item => item != null) && eventChoiceEffectLabels.All(item => item != null) && eventChoiceTooltips.All(item => item != null) &&
             debugPanelRoot != null && debugPreviousDomainButton != null && debugNextDomainButton != null && debugDomainLabel != null &&
             debugPreviousTargetButton != null && debugNextTargetButton != null && debugTargetLabel != null && debugDescriptionLabel != null &&
             debugActionButton != null && debugActionLabel != null && debugCloseButton != null &&
@@ -84,6 +87,7 @@ namespace Civic.UI
         public Button MainMenuButton => mainMenuButton;
         public Button EventAlertButton => eventAlertButton;
         public IReadOnlyList<Button> EventChoiceButtons => eventChoiceButtons ?? Array.Empty<Button>();
+        public IReadOnlyList<Text> EventChoiceEffectLabels => eventChoiceEffectLabels ?? Array.Empty<Text>();
         public Button DebugGrantResourcesButton => debugGrantResourcesButton;
         public Button DebugResearchAllButton => debugResearchAllButton;
         public Button DebugGrantPrestigeButton => debugGrantPrestigeButton;
@@ -143,6 +147,7 @@ namespace Civic.UI
 
         public void HideExitPopup()
         {
+            if (!IsExitPopupOpen) return;
             tooltipView?.Hide();
             exitPopupRoot.SetActive(false);
         }
@@ -153,9 +158,14 @@ namespace Civic.UI
             eventAlertLabel.text = queueCount > 0 ? $"이벤트 {queueCount}" : "이벤트";
         }
 
-        public void ShowEvent(CivicQueuedEventSnapshot queued, Func<CivicEventChoiceDefinition, bool> availability, Func<CivicEventChoiceDefinition, string> tooltipFactory)
+        public void ShowEvent(
+            CivicQueuedEventSnapshot queued,
+            Func<CivicEventChoiceDefinition, bool> availability,
+            Func<CivicEventChoiceDefinition, string> summaryFactory,
+            Func<CivicEventChoiceDefinition, string> tooltipFactory)
         {
             if (queued == null) return;
+            if (!IsEventPopupOpen) selectedBeforeEvent = EventSystem.current?.currentSelectedGameObject;
             currentEventId = queued.Definition.Id;
             eventTitleLabel.text = queued.Definition.TitleKo;
             eventDescriptionLabel.text = queued.Definition.DescriptionKo;
@@ -168,16 +178,22 @@ namespace Civic.UI
                 var choice = queued.Choices[index];
                 eventChoiceButtons[index].name = choice.Id;
                 eventChoiceLabels[index].text = choice.TextKo;
+                eventChoiceEffectLabels[index].text = summaryFactory?.Invoke(choice) ?? string.Empty;
                 eventChoiceButtons[index].interactable = availability?.Invoke(choice) ?? true;
                 eventChoiceTooltips[index].SetTooltipText(tooltipFactory?.Invoke(choice) ?? string.Empty);
             }
             eventPopupRoot.SetActive(true);
+            var firstChoice = eventChoiceButtons.FirstOrDefault(item => item.gameObject.activeSelf && item.interactable);
+            if (firstChoice != null) EventSystem.current?.SetSelectedGameObject(firstChoice.gameObject);
         }
 
         public void HideEventPopup()
         {
+            if (!IsEventPopupOpen) return;
             tooltipView?.Hide();
             eventPopupRoot.SetActive(false);
+            if (selectedBeforeEvent != null && selectedBeforeEvent.activeInHierarchy) EventSystem.current?.SetSelectedGameObject(selectedBeforeEvent);
+            selectedBeforeEvent = null;
         }
 
         public void ConfigureDebugDomains(IReadOnlyList<string> ids, IReadOnlyList<string> labels)
