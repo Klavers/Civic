@@ -73,12 +73,15 @@ concept 참조 깊이는 Tooltip에서 최대 12단계다. 순환 참조 검출�
 
 ## 6. 작성·검증 절차
 
-1. runtime에 새 effectType을 추가한다.
-2. 한국어 catalog에 `effect.<effectType>` entry를 추가한다.
-3. 적절한 FORMAT과 `good` 방향을 지정한다.
-4. 필요한 concept 표시명과 `.desc`를 추가한다.
-5. Editor가 열려 있으면 `Tools > Civic > Data > Validate`, 닫혀 있으면 `scripts/Invoke-Unity.ps1 -Action ValidateData`를 실행한다.
-6. 대표 패널과 Tooltip에서 raw ID가 노출되지 않는지 확인한다.
+1. `docs/localization/glossary_concepts.csv`와 `glossary_translations.csv`가 존재하면 동일 concept의 권장어·지양어를 먼저 확인한다.
+2. runtime에 새 effectType을 추가한다.
+3. 한국어 catalog에 `effect.<effectType>` entry를 추가한다.
+4. 적절한 FORMAT과 `good` 방향을 지정한다.
+5. 필요한 concept 표시명과 `.desc`를 추가한다.
+6. Editor가 열려 있으면 `Tools > Civic > Data > Validate`, 닫혀 있으면 `scripts/Invoke-Unity.ps1 -Action ValidateData`를 실행한다.
+7. 대표 패널과 Tooltip에서 raw ID가 노출되지 않는지 확인한다.
+
+용어사전 CSV는 개발자·AI 참고자료이며 runtime loader나 `ValidateData`가 읽지 않는다. strict YAML이 실제 게임 표시 문자열의 정본이다.
 
 ## 7. 실패와 fallback
 

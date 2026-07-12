@@ -150,3 +150,9 @@ P05는 다음 이슈를 단일 umbrella에서 관리한다.
 - [#48 전체 UI TextMeshPro 전환 검토](https://github.com/Klavers/Civic/issues/48)
 
 이 네 항목은 P05 완료를 차단하지 않는다. #44만 P05 필수 하위 이슈로 구현·검증한다.
+
+## §9 P06 후속 계획 연결
+
+- 개발자·AI용 용어사전은 runtime strict YAML을 대체하지 않으며 [P06a](./P06a_Localization_Glossary_planned.md)에서 관리한다.
+- 전체 GUI 배율은 Legacy `Text`와 TMP 혼재 상태를 지원하며 #48의 전체 TMP 전환을 선행조건으로 삼지 않는다. 상세 계약은 [P06b](./P06b_UI_Scale_Accessibility_planned.md)를 따른다.
+- 모듈 도메인 허브 이관은 P05의 Tooltip·modal sorting·ESC 수명주기를 보존해야 한다.

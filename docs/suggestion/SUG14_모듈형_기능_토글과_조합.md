@@ -294,3 +294,13 @@ A만 ON이면 개혁 진행은 고정 지지·저항 계산으로 작동한다. 
 - 개발·테스트 Feature Matrix는 Baseline 1개, 단독 8개, pairwise 28개, AllOn 1개로 총 38개 case를 같은 resolver로 검증한다.
 - 실제 환생·도전·문명·국가·정치·이벤트·불가사의·위인 gameplay는 아직 연결하지 않았다. 메뉴에도 이 제한을 표시하며 각 도메인 구현 시 같은 module ID에 동작을 등록한다.
 - Unity 검증 결과: Compile, GenerateMainMenu, ValidateMainMenu, FeatureMatrix, ValidateData, GenerateUI, ValidateUI, EditMode 27/27, PlayMode 2/2 및 MSBuild가 통과했다.
+
+## 16. P06 후속 결정 — 플레이 중 도메인 허브
+
+- 모듈 ON/OFF는 계속 MainMenu에서 런 시작 전에만 변경하고 런 중에는 immutable resolved set을 유지한다.
+- 플레이 중 UI는 단일 `모듈` 패널 대신 도메인 허브로 재배치한다.
+- 기존 `국가`는 국가 개요·시작 문명·국가 설립·제도 탭을 가진다.
+- 기존 `모듈` 버튼은 `진행`으로 바꾸고 환생·유산·도전과제·이벤트 이력을 표시한다.
+- 불가사의는 `프로젝트`, 위인은 `인물` 신규 버튼으로 이동한다.
+- OFF 모듈 탭과 빈 허브는 숨기지만 기본 국가 개요는 항상 유지한다.
+- 이 변경은 feature lifecycle이나 토글 계약을 바꾸지 않으며 [P06c](../plan/P06c_Domain_Hub_Navigation_planned.md)를 표시 위치 정본으로 삼는다.
