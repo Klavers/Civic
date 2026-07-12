@@ -11,6 +11,7 @@ namespace Civic.Simulation.Modules
         void BeforeAdvance(double seconds);
         void AfterAdvance(double seconds);
         void OnBuildingConstructed(string buildingId);
+        void OnBuildingsConstructed(string buildingId, int quantity);
         void OnTechnologyResearched(string technologyId);
     }
 
@@ -27,6 +28,7 @@ namespace Civic.Simulation.Modules
         public virtual void BeforeAdvance(double seconds) { }
         public virtual void AfterAdvance(double seconds) { }
         public virtual void OnBuildingConstructed(string buildingId) { }
+        public virtual void OnBuildingsConstructed(string buildingId, int quantity) => OnBuildingConstructed(buildingId);
         public virtual void OnTechnologyResearched(string technologyId) { }
     }
 

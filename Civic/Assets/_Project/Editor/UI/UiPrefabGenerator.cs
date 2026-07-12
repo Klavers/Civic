@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Civic.Features;
 using Civic.Simulation;
 using Civic.UI;
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -23,6 +25,9 @@ namespace Civic.Editor.UI
         public const string UiRootBasePath = GeneratedFolder + "/UIRoot_Base.prefab";
         public const string UiRootPath = EditableFolder + "/UIRoot.prefab";
         public const string SampleScenePath = "Assets/Scenes/SampleScene.unity";
+        public const string UiFontSourcePath = "Assets/_Project/Fonts/NanumGothic/NanumGothic.ttf";
+        public const string UiFontAssetPath = "Assets/_Project/Fonts/NanumGothic/NanumGothic SDF.asset";
+        public const string UiFontLicensePath = "Assets/StreamingAssets/ThirdPartyNotices/NanumFont-OFL-1.1.txt";
 
         [MenuItem("Tools/Civic/UI/Generate")]
         private static void GenerateFromMenu()
@@ -53,6 +58,8 @@ namespace Civic.Editor.UI
 
         public static void GenerateAssetsAt(string generatedFolder, string editableFolder)
         {
+            EnsureTmpEssentialResources();
+            var uiFont = EnsureProjectFontAsset();
             RequireAssetFolder(generatedFolder);
             RequireAssetFolder(editableFolder);
             EnsureFolder(generatedFolder);
@@ -68,7 +75,7 @@ namespace Civic.Editor.UI
                 throw new InvalidOperationException($"Missing data source asset: {CivicGameDataSource.DefaultAssetPath}");
             }
 
-            var hudBase = BuildCivicHudBase(hudBasePath, dataSource);
+            var hudBase = BuildCivicHudBase(hudBasePath, dataSource, uiFont);
             var hudVariant = CreateVariantIfMissing(hudBase, hudPath, "CivicHud");
             var rootBase = BuildUiRootBase(rootBasePath, hudVariant);
             CreateVariantIfMissing(rootBase, rootPath, "UIRoot");
@@ -119,7 +126,7 @@ namespace Civic.Editor.UI
             EditorSceneManager.SaveScene(activeScene);
         }
 
-        private static GameObject BuildCivicHudBase(string assetPath, CivicGameDataSource dataSource)
+        private static GameObject BuildCivicHudBase(string assetPath, CivicGameDataSource dataSource, TMP_FontAsset uiFont)
         {
             var loaded = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath) != null;
             var root = loaded
@@ -195,7 +202,7 @@ namespace Civic.Editor.UI
                     DestroyChildIfExists(detailPanel.transform, $"TechnologyActionRow{index + 1:00}");
                 }
 
-                var tooltipView = CreateTooltipView(root.transform);
+                var tooltipView = CreateTooltipView(root.transform, uiFont);
                 var gameData = dataSource.LoadGameData();
                 var resourceRowCount = Math.Max(
                     1,
@@ -219,8 +226,10 @@ namespace Civic.Editor.UI
 
                 var buildingPanel = GetOrCreateChild(detailPanel.transform, "BuildingDetailPanel", typeof(RectTransform));
                 SetStretchRect(buildingPanel.GetComponent<RectTransform>(), 16f, 86f, 16f, 18f);
+                var buildingQuantityButtons = CreateBuildingQuantityButtons(buildingPanel.transform);
+                var buildingQuantityLabels = buildingQuantityButtons.Select(button => button.GetComponentInChildren<Text>(true)).ToArray();
                 CreateBuildingHeaderRow(buildingPanel.transform);
-                var buildingScroll = CreateScrollArea(buildingPanel.transform, "BuildingScroll", buildingRowCount * 56f, 42f);
+                var buildingScroll = CreateScrollArea(buildingPanel.transform, "BuildingScroll", buildingRowCount * 56f, 90f);
                 var buildingActionRows = CreateBuildingActionRows(buildingScroll.Content, tooltipView, buildingRowCount);
 
                 var technologyPanel = GetOrCreateChild(detailPanel.transform, "TechnologyDetailPanel", typeof(RectTransform));
@@ -292,6 +301,8 @@ namespace Civic.Editor.UI
                 AssignObjectArray(viewObject, "buildingGdpDeltaLabels", buildingActionRows.GdpDeltaLabels);
                 AssignObjectArray(viewObject, "buildingActionButtons", buildingActionRows.Buttons);
                 AssignObjectArray(viewObject, "buildingButtonTooltips", buildingActionRows.ButtonTooltips);
+                AssignObjectArray(viewObject, "buildingQuantityButtons", buildingQuantityButtons);
+                AssignObjectArray(viewObject, "buildingQuantityLabels", buildingQuantityLabels);
                 AssignObjectArray(viewObject, "eraTabRows", eraTabs.Rows);
                 AssignObjectArray(viewObject, "eraTabLabels", eraTabs.InfoLabels);
                 AssignObjectArray(viewObject, "eraTabButtons", eraTabs.Buttons);
@@ -548,7 +559,7 @@ namespace Civic.Editor.UI
         private static void CreateBuildingHeaderRow(Transform parent)
         {
             var header = GetOrCreateChild(parent, "BuildingHeaderRow", typeof(RectTransform), typeof(Image));
-            SetTopStretchRect(header.GetComponent<RectTransform>(), 0f, 0f, 0f, 36f);
+            SetTopStretchRect(header.GetComponent<RectTransform>(), 0f, 48f, 0f, 36f);
             header.GetComponent<Image>().color = new Color(0.04f, 0.06f, 0.07f, 1f);
             CreateColumnText(header.transform, "HeaderBuildingNameLabel", "건물명", 10f, 150f, TextAnchor.MiddleLeft);
             CreateColumnText(header.transform, "HeaderBuildingCountLabel", "개수", 165f, 58f, TextAnchor.MiddleCenter);
@@ -567,37 +578,178 @@ namespace Civic.Editor.UI
             return label;
         }
 
-        private static CivicTooltipView CreateTooltipView(Transform parent)
+        private static CivicTooltipView CreateTooltipView(Transform parent, TMP_FontAsset uiFont)
         {
-            var tooltipObject = GetOrCreateChild(parent, "Tooltip", typeof(RectTransform), typeof(Image));
+            DestroyChildIfExists(parent, "Tooltip");
+            var tooltipObject = GetOrCreateChild(parent, "Tooltip", typeof(RectTransform), typeof(Canvas), typeof(GraphicRaycaster));
             var tooltipRect = tooltipObject.GetComponent<RectTransform>();
-            tooltipRect.anchorMin = new Vector2(0f, 1f);
-            tooltipRect.anchorMax = new Vector2(0f, 1f);
-            tooltipRect.pivot = new Vector2(0f, 1f);
-            tooltipRect.anchoredPosition = Vector2.zero;
-            tooltipRect.sizeDelta = new Vector2(360f, 160f);
-            tooltipRect.localScale = Vector3.one;
-            var tooltipImage = tooltipObject.GetComponent<Image>();
-            tooltipImage.color = new Color(0.02f, 0.025f, 0.03f, 0.96f);
-            tooltipImage.raycastTarget = false;
-            var tooltipCanvasGroup = GetOrAdd<CanvasGroup>(tooltipObject);
-            tooltipCanvasGroup.interactable = false;
-            tooltipCanvasGroup.blocksRaycasts = false;
+            SetStretchRect(tooltipRect, 0f, 0f, 0f, 0f);
+            var canvas = tooltipObject.GetComponent<Canvas>();
+            ConfigureCanvasSorting(canvas, 200);
 
-            var label = GetOrCreateText(tooltipObject.transform, "BodyLabel");
-            label.text = "Tooltip";
-            label.fontSize = 15;
-            label.alignment = TextAnchor.UpperLeft;
-            label.raycastTarget = false;
-            SetStretchRect(label.rectTransform, 12f, 10f, 12f, 10f);
+            var cards = new CivicTooltipCard[CivicTooltipView.MaximumDepth];
+            for (var index = 0; index < cards.Length; index++)
+            {
+                var cardObject = GetOrCreateChild(tooltipObject.transform, $"TooltipCard{index + 1:00}", typeof(RectTransform), typeof(Image), typeof(Outline));
+                var cardRect = cardObject.GetComponent<RectTransform>();
+                cardRect.anchorMin = Vector2.zero;
+                cardRect.anchorMax = Vector2.zero;
+                cardRect.pivot = new Vector2(0f, 1f);
+                cardRect.anchoredPosition = Vector2.zero;
+                cardRect.sizeDelta = new Vector2(420f, 160f);
+                cardRect.localScale = Vector3.one;
+                var background = cardObject.GetComponent<Image>();
+                background.color = new Color(0.02f, 0.025f, 0.03f, 0.98f);
+                background.raycastTarget = false;
+                var outline = cardObject.GetComponent<Outline>();
+                outline.effectColor = new Color(0.30f, 0.38f, 0.48f, 0.55f);
+                outline.effectDistance = new Vector2(1f, -1f);
+                outline.useGraphicAlpha = false;
+
+                var bodyObject = GetOrCreateChild(cardObject.transform, "BodyLabel", typeof(RectTransform), typeof(TextMeshProUGUI));
+                var body = bodyObject.GetComponent<TextMeshProUGUI>();
+                body.font = uiFont;
+                body.text = "Tooltip";
+                body.fontSize = 15f;
+                body.color = new Color(0.92f, 0.94f, 0.96f, 1f);
+                body.alignment = TextAlignmentOptions.TopLeft;
+                body.enableWordWrapping = true;
+                body.richText = true;
+                body.raycastTarget = true;
+                SetStretchRect(body.rectTransform, 14f, 12f, 14f, 12f);
+
+                var footerObject = GetOrCreateChild(cardObject.transform, "FooterLabel", typeof(RectTransform), typeof(TextMeshProUGUI));
+                var footer = footerObject.GetComponent<TextMeshProUGUI>();
+                footer.font = uiFont;
+                footer.text = string.Empty;
+                footer.fontSize = 14f;
+                footer.color = new Color(0.55f, 0.75f, 1f, 1f);
+                footer.alignment = TextAlignmentOptions.BottomLeft;
+                footer.enableWordWrapping = false;
+                footer.richText = true;
+                footer.raycastTarget = true;
+                SetStretchRect(footer.rectTransform, 14f, 0f, 14f, 8f);
+
+                var card = GetOrAdd<CivicTooltipCard>(cardObject);
+                var cardSerialized = new SerializedObject(card);
+                cardSerialized.FindProperty("panel").objectReferenceValue = cardRect;
+                cardSerialized.FindProperty("background").objectReferenceValue = background;
+                cardSerialized.FindProperty("outline").objectReferenceValue = outline;
+                cardSerialized.FindProperty("bodyLabel").objectReferenceValue = body;
+                cardSerialized.FindProperty("footerLabel").objectReferenceValue = footer;
+                cardSerialized.ApplyModifiedPropertiesWithoutUndo();
+                cardObject.SetActive(false);
+                cards[index] = card;
+            }
 
             var tooltip = GetOrAdd<CivicTooltipView>(tooltipObject);
             var tooltipSerialized = new SerializedObject(tooltip);
-            tooltipSerialized.FindProperty("panel").objectReferenceValue = tooltipRect;
-            tooltipSerialized.FindProperty("bodyLabel").objectReferenceValue = label;
+            tooltipSerialized.FindProperty("tooltipCanvas").objectReferenceValue = canvas;
+            tooltipSerialized.FindProperty("cards").arraySize = cards.Length;
+            for (var index = 0; index < cards.Length; index++) tooltipSerialized.FindProperty("cards").GetArrayElementAtIndex(index).objectReferenceValue = cards[index];
             tooltipSerialized.ApplyModifiedPropertiesWithoutUndo();
-            tooltipObject.SetActive(false);
+            tooltipObject.SetActive(true);
             return tooltip;
+        }
+
+        private static void EnsureTmpEssentialResources()
+        {
+            if (Resources.Load<TMP_Settings>("TMP Settings") != null) return;
+            var package = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(TMP_Text).Assembly);
+            var packagePath = package == null ? string.Empty : Path.Combine(package.resolvedPath, "Package Resources", "TMP Essential Resources.unitypackage");
+            if (string.IsNullOrEmpty(packagePath) || !File.Exists(packagePath))
+            {
+                throw new InvalidOperationException("TMP Essential Resources가 없습니다. Window > TextMeshPro > Import TMP Essential Resources를 먼저 실행하십시오.");
+            }
+            AssetDatabase.ImportPackage(packagePath, false);
+            AssetDatabase.Refresh();
+            if (Resources.Load<TMP_Settings>("TMP Settings") == null)
+            {
+                throw new InvalidOperationException("TMP Essential Resources 가져오기가 완료되지 않았습니다. 가져오기 완료 후 UI Generate를 다시 실행하십시오.");
+            }
+        }
+
+        private static TMP_FontAsset EnsureProjectFontAsset()
+        {
+            var sourceFont = AssetDatabase.LoadAssetAtPath<Font>(UiFontSourcePath);
+            if (sourceFont == null)
+            {
+                throw new InvalidOperationException($"Missing Civic UI font source: {UiFontSourcePath}");
+            }
+
+            if (AssetDatabase.LoadMainAssetAtPath(UiFontLicensePath) == null)
+            {
+                throw new InvalidOperationException($"Missing Nanum font license: {UiFontLicensePath}");
+            }
+
+            var fontAsset = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(UiFontAssetPath);
+            if (fontAsset == null)
+            {
+                fontAsset = TMP_FontAsset.CreateFontAsset(sourceFont);
+                if (fontAsset == null)
+                {
+                    throw new InvalidOperationException($"Unable to create TMP font asset from {UiFontSourcePath}");
+                }
+
+                fontAsset.name = "NanumGothic SDF";
+                AssetDatabase.CreateAsset(fontAsset, UiFontAssetPath);
+                if (fontAsset.atlasTexture != null)
+                {
+                    AssetDatabase.AddObjectToAsset(fontAsset.atlasTexture, fontAsset);
+                }
+
+                if (fontAsset.material != null)
+                {
+                    AssetDatabase.AddObjectToAsset(fontAsset.material, fontAsset);
+                }
+            }
+
+            if (fontAsset.sourceFontFile != sourceFont)
+            {
+                throw new InvalidOperationException($"TMP font asset source does not match {UiFontSourcePath}: {UiFontAssetPath}");
+            }
+
+            fontAsset.atlasPopulationMode = AtlasPopulationMode.Dynamic;
+            fontAsset.isMultiAtlasTexturesEnabled = true;
+            EditorUtility.SetDirty(fontAsset);
+
+            var settings = Resources.Load<TMP_Settings>("TMP Settings");
+            if (settings == null)
+            {
+                throw new InvalidOperationException("TMP Settings could not be loaded after importing essential resources.");
+            }
+
+            TMP_Settings.defaultFontAsset = fontAsset;
+            EditorUtility.SetDirty(settings);
+            return fontAsset;
+        }
+
+        private static Button[] CreateBuildingQuantityButtons(Transform parent)
+        {
+            var bar = GetOrCreateChild(parent, "BuildingQuantityBar", typeof(RectTransform), typeof(Image));
+            SetTopStretchRect(bar.GetComponent<RectTransform>(), 0f, 0f, 0f, 42f);
+            bar.GetComponent<Image>().color = new Color(0.055f, 0.075f, 0.10f, 1f);
+            var title = GetOrCreateText(bar.transform, "TitleLabel");
+            title.text = "건설 수량";
+            title.fontSize = 15;
+            title.alignment = TextAnchor.MiddleLeft;
+            SetLeftRect(title.rectTransform, 12f, 100f, 36f);
+            var labels = new[] { "1", "5", "10", "25", "Max" };
+            var buttons = new Button[labels.Length];
+            for (var index = 0; index < labels.Length; index++)
+            {
+                var button = GetOrCreateButton(bar.transform, $"Quantity{labels[index]}Button");
+                SetRect(button.GetComponent<RectTransform>(), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(150f + index * 86f, 0f), new Vector2(76f, 34f));
+                button.GetComponent<Image>().color = new Color(0.16f, 0.26f, 0.38f, 1f);
+                ConfigureButtonColors(button);
+                var label = GetOrCreateText(button.transform, "Label");
+                label.text = labels[index];
+                label.fontSize = 15;
+                label.alignment = TextAnchor.MiddleCenter;
+                SetRect(label.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+                buttons[index] = button;
+            }
+            return buttons;
         }
 
         private static DetailActionRows CreateEraTabRows(Transform parent, int count)
@@ -990,6 +1142,7 @@ namespace Civic.Editor.UI
             SetRect(eventAlertLabel.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
             var exitPopup = CreateModalPanel(root.transform, "ExitPopup", new Vector2(520f, 300f));
+            ConfigureOverlayCanvas(exitPopup, 80);
             var exitTitle = GetOrCreateText(exitPopup.transform, "TitleLabel");
             exitTitle.text = "게임 메뉴";
             exitTitle.fontSize = 30;
@@ -1003,7 +1156,16 @@ namespace Civic.Editor.UI
             var continueButton = CreateModalButton(exitPopup.transform, "ContinueButton", "계속 플레이", new Vector2(-125f, -86f), new Vector2(220f, 58f));
             var mainMenuButton = CreateModalButton(exitPopup.transform, "MainMenuButton", "메인 메뉴로", new Vector2(125f, -86f), new Vector2(220f, 58f));
 
-            var eventPopup = CreateModalPanel(root.transform, "EventPopup", new Vector2(860f, 580f));
+            DestroyChildIfExists(root.transform, "EventPopup");
+            DestroyChildIfExists(root.transform, "EventModalLayer");
+            var eventModalLayer = GetOrCreateChild(root.transform, "EventModalLayer", typeof(RectTransform), typeof(Canvas), typeof(GraphicRaycaster), typeof(Image));
+            SetStretchRect(eventModalLayer.GetComponent<RectTransform>(), 0f, 0f, 0f, 0f);
+            var eventCanvas = eventModalLayer.GetComponent<Canvas>();
+            ConfigureCanvasSorting(eventCanvas, 100);
+            var eventBlocker = eventModalLayer.GetComponent<Image>();
+            eventBlocker.color = new Color(0f, 0f, 0f, 0.38f);
+            eventBlocker.raycastTarget = true;
+            var eventPopup = CreateModalPanel(eventModalLayer.transform, "EventPopup", new Vector2(860f, 580f));
             var eventTitle = GetOrCreateText(eventPopup.transform, "TitleLabel");
             eventTitle.text = "이벤트";
             eventTitle.fontSize = 30;
@@ -1023,18 +1185,32 @@ namespace Civic.Editor.UI
             SetRect(eventDescription.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 1f), new Vector2(32f, -154f), new Vector2(-64f, -156f));
             var eventChoiceButtons = new Button[3];
             var eventChoiceLabels = new Text[3];
+            var eventChoiceEffectLabels = new Text[3];
             var eventChoiceTooltips = new CivicTooltipTrigger[3];
             for (var index = 0; index < 3; index++)
             {
                 var button = CreateModalButton(eventPopup.transform, $"ChoiceButton{index + 1:00}", $"선택지 {index + 1}", new Vector2(0f, 70f - index * 82f), new Vector2(780f, 64f));
                 var trigger = GetOrAdd<CivicTooltipTrigger>(button.gameObject);
                 trigger.AssignTooltipView(tooltipView);
+                var choiceLabel = button.transform.Find("Label").GetComponent<Text>();
+                choiceLabel.alignment = TextAnchor.UpperCenter;
+                choiceLabel.fontSize = 17;
+                SetRect(choiceLabel.rectTransform, new Vector2(0f, 0.5f), Vector2.one, new Vector2(0f, -3f), Vector2.zero);
+                var effectLabel = GetOrCreateText(button.transform, "EffectLabel");
+                effectLabel.text = "효과 요약";
+                effectLabel.fontSize = 14;
+                effectLabel.color = new Color(0.78f, 0.86f, 0.96f, 1f);
+                effectLabel.alignment = TextAnchor.LowerCenter;
+                effectLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
+                SetRect(effectLabel.rectTransform, Vector2.zero, new Vector2(1f, 0.5f), new Vector2(0f, 3f), Vector2.zero);
                 eventChoiceButtons[index] = button;
-                eventChoiceLabels[index] = button.transform.Find("Label").GetComponent<Text>();
+                eventChoiceLabels[index] = choiceLabel;
+                eventChoiceEffectLabels[index] = effectLabel;
                 eventChoiceTooltips[index] = trigger;
             }
 
             var debugPanel = CreateModalPanel(root.transform, "DebugPanel", new Vector2(980f, 720f));
+            ConfigureOverlayCanvas(debugPanel, 80);
             DestroyChildIfExists(debugPanel.transform, "DescriptionLabel");
             var debugTitle = GetOrCreateText(debugPanel.transform, "TitleLabel");
             debugTitle.text = "DEBUG · Backquote(`)";
@@ -1100,13 +1276,14 @@ namespace Civic.Editor.UI
             serialized.FindProperty("mainMenuButton").objectReferenceValue = mainMenuButton;
             serialized.FindProperty("eventAlertButton").objectReferenceValue = eventAlertButton;
             serialized.FindProperty("eventAlertLabel").objectReferenceValue = eventAlertLabel;
-            serialized.FindProperty("eventPopupRoot").objectReferenceValue = eventPopup;
+            serialized.FindProperty("eventPopupRoot").objectReferenceValue = eventModalLayer;
             serialized.FindProperty("eventTitleLabel").objectReferenceValue = eventTitle;
             serialized.FindProperty("eventDescriptionLabel").objectReferenceValue = eventDescription;
             serialized.FindProperty("eventCauseLabel").objectReferenceValue = eventCause;
             serialized.FindProperty("eventCloseButton").objectReferenceValue = eventCloseButton;
             AssignObjectArray(serialized, "eventChoiceButtons", eventChoiceButtons);
             AssignObjectArray(serialized, "eventChoiceLabels", eventChoiceLabels);
+            AssignObjectArray(serialized, "eventChoiceEffectLabels", eventChoiceEffectLabels);
             AssignObjectArray(serialized, "eventChoiceTooltips", eventChoiceTooltips);
             serialized.FindProperty("debugPanelRoot").objectReferenceValue = debugPanel;
             serialized.FindProperty("debugPreviousDomainButton").objectReferenceValue = previousDomain;
@@ -1129,10 +1306,10 @@ namespace Civic.Editor.UI
 
             eventAlertButton.gameObject.SetActive(false);
             exitPopup.SetActive(false);
-            eventPopup.SetActive(false);
+            eventModalLayer.SetActive(false);
             debugPanel.SetActive(false);
             exitPopup.transform.SetAsLastSibling();
-            eventPopup.transform.SetAsLastSibling();
+            eventModalLayer.transform.SetAsLastSibling();
             debugPanel.transform.SetAsLastSibling();
             return view;
         }
@@ -1143,6 +1320,28 @@ namespace Civic.Editor.UI
             SetRect(panel.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, size);
             panel.GetComponent<Image>().color = new Color(0.055f, 0.075f, 0.105f, 0.995f);
             return panel;
+        }
+
+        private static void ConfigureOverlayCanvas(GameObject panel, int sortingOrder)
+        {
+            var canvas = GetOrAdd<Canvas>(panel);
+            ConfigureCanvasSorting(canvas, sortingOrder);
+            GetOrAdd<GraphicRaycaster>(panel);
+        }
+
+        private static void ConfigureCanvasSorting(Canvas canvas, int sortingOrder)
+        {
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = sortingOrder;
+
+            // CivicHud Base is generated without its eventual parent Canvas. Unity can
+            // normalize overrideSorting back to false while saving that standalone prefab,
+            // so persist the nested-canvas contract explicitly for the UIRoot instance.
+            var serialized = new SerializedObject(canvas);
+            serialized.FindProperty("m_OverrideSorting").boolValue = true;
+            serialized.FindProperty("m_SortingOrder").intValue = sortingOrder;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(canvas);
         }
 
         private static Button CreateModalButton(Transform parent, string name, string label, Vector2 position, Vector2 size)

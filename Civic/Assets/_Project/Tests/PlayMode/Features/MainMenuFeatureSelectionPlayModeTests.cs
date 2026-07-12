@@ -29,6 +29,9 @@ namespace Civic.UI.Tests
             Assert.That(controller, Is.Not.Null);
             Assert.That(controller.HasRequiredReferences, Is.True);
             Assert.That(controller.MainPanel.activeSelf, Is.True);
+            Assert.That(Camera.main, Is.Not.Null);
+            Assert.That(Camera.main.enabled, Is.True);
+            Assert.That(Object.FindObjectsByType<AudioListener>(FindObjectsSortMode.None).Count(listener => listener.enabled && listener.gameObject.activeInHierarchy), Is.EqualTo(1));
 
             controller.OpenFeaturePanelButton.onClick.Invoke();
             yield return null;

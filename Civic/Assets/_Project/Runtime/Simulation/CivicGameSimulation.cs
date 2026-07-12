@@ -106,13 +106,35 @@ namespace Civic.Simulation
 
         public bool TryBuild(string buildingId)
         {
-            if (!Data.BuildingsById.TryGetValue(buildingId, out var building) || !CanBuild(building))
+            return TryBuildBatch(buildingId, CivicBuildQuantityMode.One, out _);
+        }
+
+        public CivicBuildQuote PreviewBuild(string buildingId, CivicBuildQuantityMode mode)
+        {
+            if (!Data.BuildingsById.TryGetValue(buildingId, out var building))
             {
-                return false;
+                return new CivicBuildQuote(buildingId, mode, 0, 0, CivicNumber.Zero, CivicNumber.Zero, false, "알 수 없는 건물");
             }
 
-            State.Resources[ConstructionPowerId] = State.Resources[ConstructionPowerId] - GetEffectiveConstructionCost(building);
-            State.Buildings[building.Id] = State.Buildings.TryGetValue(building.Id, out var count) ? count + 1 : 1;
+            var unitCost = GetEffectiveConstructionCost(building);
+            if (!building.IsBuildable) return new CivicBuildQuote(buildingId, mode, 0, 0, unitCost, CivicNumber.Zero, false, "건설 불가");
+            if (!IsBuildingUnlocked(building)) return new CivicBuildQuote(buildingId, mode, 0, 0, unitCost, CivicNumber.Zero, false, "기술 필요");
+
+            var maximum = MaximumBuildQuantity(building, unitCost);
+            var requested = mode == CivicBuildQuantityMode.Maximum ? maximum : (int)mode;
+            var canBuild = requested > 0 && maximum >= requested;
+            var reason = canBuild ? string.Empty : maximum <= 0 ? GetBuildBlockReasonForQuantity(building, unitCost, 1) : $"선택 수량 {requested}개 건설 불가 · 최대 {maximum}개";
+            return new CivicBuildQuote(buildingId, mode, requested, maximum, unitCost, unitCost * requested, canBuild, reason);
+        }
+
+        public bool TryBuildBatch(string buildingId, CivicBuildQuantityMode mode, out CivicBuildQuote quote)
+        {
+            quote = PreviewBuild(buildingId, mode);
+            if (!quote.CanBuild || !Data.BuildingsById.TryGetValue(buildingId, out var building)) return false;
+            var quantity = quote.Quantity;
+
+            State.Resources[ConstructionPowerId] = State.Resources[ConstructionPowerId] - quote.TotalCost;
+            State.Buildings[building.Id] = State.Buildings.TryGetValue(building.Id, out var count) ? count + quantity : quantity;
 
             if (building.Role == BuildingRole.Housing)
             {
@@ -120,7 +142,7 @@ namespace Civic.Simulation
                 {
                     if (output.ResourceId != PopulationId)
                     {
-                        AddResource(output.ResourceId, output.Amount);
+                        AddResource(output.ResourceId, output.Amount * quantity);
                     }
                 }
             }
@@ -159,22 +181,7 @@ namespace Civic.Simulation
 
         public bool CanBuild(BuildingDefinition building)
         {
-            if (building == null || !building.IsBuildable)
-            {
-                return false;
-            }
-
-            if (!IsBuildingUnlocked(building))
-            {
-                return false;
-            }
-
-            if (State.Resources[ConstructionPowerId] < GetEffectiveConstructionCost(building))
-            {
-                return false;
-            }
-
-            return !IsBlockedByPopulationLimit(building);
+            return building != null && PreviewBuild(building.Id, CivicBuildQuantityMode.One).CanBuild;
         }
 
         public bool CanResearch(TechnologyDefinition technology)
@@ -961,26 +968,32 @@ namespace Civic.Simulation
 
         private string GetBuildBlockReason(BuildingDefinition building)
         {
-            if (!building.IsBuildable)
-            {
-                return "건설 불가";
-            }
+            return PreviewBuild(building.Id, CivicBuildQuantityMode.One).BlockReason;
+        }
 
-            if (!IsBuildingUnlocked(building))
+        private int MaximumBuildQuantity(BuildingDefinition building, CivicNumber unitCost)
+        {
+            var constructionRatio = (GetResource(ConstructionPowerId) / unitCost).ToDouble();
+            var byConstruction = double.IsInfinity(constructionRatio) || constructionRatio >= int.MaxValue
+                ? int.MaxValue
+                : Math.Max(0, (int)Math.Floor(constructionRatio + IntegerEpsilon));
+            var byPopulation = int.MaxValue;
+            var populationUse = GetEffectivePopulationUse(building);
+            if (!ProducesPopulation(building) && populationUse > 0)
             {
-                return "기술 필요";
+                byPopulation = Math.Max(0, (GetPopulationCount() - GetUsedPopulationCount()) / populationUse);
             }
+            var current = State.Buildings.TryGetValue(building.Id, out var count) ? count : 0;
+            var byStorage = int.MaxValue - Math.Max(0, current);
+            return Math.Max(0, Math.Min(byConstruction, Math.Min(byPopulation, byStorage)));
+        }
 
-            if (State.Resources[ConstructionPowerId] < GetEffectiveConstructionCost(building))
-            {
-                return "건설력 부족";
-            }
-
-            if (IsBlockedByPopulationLimit(building))
-            {
-                return "인구 한도";
-            }
-
+        private string GetBuildBlockReasonForQuantity(BuildingDefinition building, CivicNumber unitCost, int quantity)
+        {
+            if (!building.IsBuildable) return "건설 불가";
+            if (!IsBuildingUnlocked(building)) return "기술 필요";
+            if (GetResource(ConstructionPowerId) < unitCost * quantity) return $"건설력 부족 · 필요 {(unitCost * quantity).ToShortString()}";
+            if (!ProducesPopulation(building) && GetUsedPopulationCount() + GetEffectivePopulationUse(building) * quantity > GetPopulationCount()) return "인구 한도";
             return string.Empty;
         }
 
@@ -1138,8 +1151,9 @@ namespace Civic.Simulation
         {
             var targets = GetBuildingModifierTargets(building);
             var additive = CivicNumber.FromDouble(Modifiers.Additive(CivicModifierEffectTypes.ConstructionCostAdd, targets));
-            return CivicNumber.ClampMinZero(
+            var effective = CivicNumber.ClampMinZero(
                 (building.ConstructionCost + additive) * Modifiers.Multiplier(CivicModifierEffectTypes.ConstructionCostMultiplier, targets));
+            return building.IsBuildable ? CivicNumber.Max(CivicNumber.One, effective) : effective;
         }
 
         private CivicNumber GetEffectiveTechnologyCost(TechnologyDefinition technology)
@@ -1393,28 +1407,7 @@ namespace Civic.Simulation
 
         private string FormatTechnologyEffectSummary(TechnologyEffectDefinition effect)
         {
-            if (!string.IsNullOrEmpty(effect.SummaryKo))
-            {
-                return effect.SummaryKo;
-            }
-
-            var buildingName = Data.BuildingsById.TryGetValue(effect.TargetBuildingId, out var building)
-                ? building.DisplayNameKo
-                : effect.TargetBuildingId;
-            var inputName = Data.ResourcesById.TryGetValue(effect.InputResourceId, out var input)
-                ? input.DisplayNameKo
-                : effect.InputResourceId;
-            var outputName = Data.ResourcesById.TryGetValue(effect.OutputResourceId, out var output)
-                ? output.DisplayNameKo
-                : effect.OutputResourceId;
-            return effect.EffectType switch
-            {
-                TechnologyEffectType.OutputAdd => $"{buildingName} {outputName} +{effect.Amount.ToShortString()}/s",
-                TechnologyEffectType.ConditionalOutputAdd => $"{buildingName}: {inputName} 투입 시 {outputName} +{effect.Amount.ToShortString()}/s",
-                TechnologyEffectType.TaxRateAdd => $"세율 +{effect.Amount.ToShortString()}",
-                TechnologyEffectType.PlannedFollowUp => "그룹 효과 후속 구현 예정",
-                _ => string.Empty,
-            };
+            return CivicEffectText.DescribeTechnologyEffect(effect, Data);
         }
 
         private void AddPopulationConsumptionDemand(IDictionary<string, CivicNumber> normalDemand)

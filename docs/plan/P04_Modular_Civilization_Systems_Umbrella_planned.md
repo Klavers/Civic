@@ -874,3 +874,7 @@ Editor가 닫혀 있고 Unity 프로세스와 `Civic/Temp/UnityLockfile`이 없�
 - Tooltip 배경과 본문의 raycast를 끄고 `CanvasGroup`이 입력을 차단하지 않도록 보정했다. 국가 modifier 상세 행은 본문 높이에 맞춰 `LayoutElement.preferredHeight`와 ScrollRect content layout을 갱신한다.
 - 생성기·EditMode·PlayMode 검증을 추가하고 생성 Base Prefab에 반영했다.
 - 사용자 실행 기준 `Compile`, `GenerateUI`, `ValidateUI`, EditMode, PlayMode 및 후속 검증을 통과했다.
+
+## §24 P06 후속 계획 연결
+
+P04의 feature registry, 런 시작 전 ON/OFF, immutable resolved set, Feature Matrix 계약은 유지된다. 플레이 중 모듈 탐색 재배치, 랜덤 시작 문명, 저티어·문명별 제도는 [P06 umbrella](./P06_Player_Choice_Governance_Navigation_Accessibility_Umbrella_planned.md)에서 후속 관리한다. P06은 P04의 구현 기록을 대체하지 않고 해당 기반 위에서 별도 하위 PR로 진행한다.

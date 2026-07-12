@@ -479,6 +479,76 @@ namespace Civic.UI.Tests
             Assert.That(treasury.NetPerSecond.ToDouble(), Is.EqualTo(treasury.ProducedPerSecond.ToDouble() - 0.5d).Within(0.0001d));
         }
 
+        [Test]
+        public void FixedBatchBuild_IsAllOrNothing()
+        {
+            var simulation = new CivicGameSimulation(LoadDefaultData());
+            simulation.State.BasePopulation = CivicNumber.FromDouble(100d);
+            simulation.State.Resources["construction_power"] = CivicNumber.FromDouble(14d);
+            simulation.RefreshSnapshot();
+
+            var quote = simulation.PreviewBuild("logging_camp", CivicBuildQuantityMode.Five);
+            var beforePower = simulation.State.Resources["construction_power"];
+            var beforeCount = simulation.State.Buildings["logging_camp"];
+
+            Assert.That(quote.CanBuild, Is.False);
+            Assert.That(quote.Quantity, Is.EqualTo(5));
+            Assert.That(simulation.TryBuildBatch("logging_camp", CivicBuildQuantityMode.Five, out _), Is.False);
+            Assert.That(simulation.State.Resources["construction_power"], Is.EqualTo(beforePower));
+            Assert.That(simulation.State.Buildings["logging_camp"], Is.EqualTo(beforeCount));
+        }
+
+        [Test]
+        public void MaximumBatchBuild_UsesConstructionAndPopulationLimits()
+        {
+            var simulation = new CivicGameSimulation(LoadDefaultData());
+            simulation.State.BasePopulation = CivicNumber.FromDouble(7d);
+            simulation.State.Resources["construction_power"] = CivicNumber.FromDouble(1000d);
+            simulation.RefreshSnapshot();
+
+            var quote = simulation.PreviewBuild("logging_camp", CivicBuildQuantityMode.Maximum);
+
+            Assert.That(quote.CanBuild, Is.True);
+            Assert.That(quote.Quantity, Is.EqualTo(7));
+            Assert.That(simulation.TryBuildBatch("logging_camp", CivicBuildQuantityMode.Maximum, out var committed), Is.True);
+            Assert.That(committed.Quantity, Is.EqualTo(7));
+            Assert.That(simulation.State.Buildings["logging_camp"], Is.EqualTo(7));
+            Assert.That(simulation.Snapshot.UsedPopulation.ToDouble(), Is.EqualTo(7d).Within(0.0001d));
+        }
+
+        [Test]
+        public void BuildableConstructionCost_IsClampedToOneAfterModifiers()
+        {
+            var simulation = new CivicGameSimulation(LoadDefaultData());
+            simulation.Modifiers.Add(new CivicModifierEntry("test", "free", CivicModifierEffectTypes.ConstructionCostAdd, "logging_camp", -1000d));
+            simulation.State.Resources["construction_power"] = CivicNumber.FromDouble(3d);
+            simulation.State.BasePopulation = CivicNumber.FromDouble(10d);
+            simulation.RefreshSnapshot();
+
+            var quote = simulation.PreviewBuild("logging_camp", CivicBuildQuantityMode.Maximum);
+
+            Assert.That(quote.UnitCost.ToDouble(), Is.EqualTo(1d).Within(0.0001d));
+            Assert.That(quote.Quantity, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void PopulationProducingBuilding_BatchIgnoresUsedPopulationLimit()
+        {
+            var simulation = new CivicGameSimulation(LoadDefaultData());
+            simulation.State.BasePopulation = CivicNumber.FromDouble(3d);
+            simulation.State.Buildings["logging_camp"] = 3;
+            simulation.State.Resources["construction_power"] = CivicNumber.FromDouble(100d);
+            simulation.RefreshSnapshot();
+
+            var quote = simulation.PreviewBuild("house", CivicBuildQuantityMode.Five);
+
+            Assert.That(simulation.Snapshot.UsedPopulation.ToDouble(), Is.EqualTo(3d).Within(0.0001d));
+            Assert.That(quote.CanBuild, Is.True);
+            Assert.That(simulation.TryBuildBatch("house", CivicBuildQuantityMode.Five, out _), Is.True);
+            Assert.That(simulation.State.Buildings["house"], Is.EqualTo(5));
+            Assert.That(simulation.Snapshot.Population.ToDouble(), Is.GreaterThan(3d));
+        }
+
         private static CivicGameData LoadDefaultData()
         {
             return LoadDefaultDataSource().LoadGameData();

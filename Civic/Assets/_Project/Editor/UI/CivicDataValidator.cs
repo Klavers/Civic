@@ -34,6 +34,8 @@ namespace Civic.Editor.UI
             }
 
             var data = dataSource.LoadGameData();
+            var localization = CivicLocalizationService.LoadDefault();
+            CivicLocalizationValidator.Validate(localization, CivicEffectText.RequiredEffectTypes);
             var balances = CivicModuleBalanceContentLoader.LoadFromResources();
             balances.ValidateAgainst(data);
             var moduleContent = CivicModuleContentLoader.LoadFromResources();

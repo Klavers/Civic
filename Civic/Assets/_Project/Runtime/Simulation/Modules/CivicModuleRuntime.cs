@@ -137,7 +137,12 @@ namespace Civic.Simulation.Modules
 
         public bool TryBuild(string buildingId)
         {
-            if (!Simulation.TryBuild(buildingId))
+            return TryBuildBatch(buildingId, CivicBuildQuantityMode.One, out _);
+        }
+
+        public bool TryBuildBatch(string buildingId, CivicBuildQuantityMode mode, out CivicBuildQuote quote)
+        {
+            if (!Simulation.TryBuildBatch(buildingId, mode, out quote))
             {
                 return false;
             }
@@ -146,7 +151,7 @@ namespace Civic.Simulation.Modules
             Telemetry.Observe(0d);
             foreach (var module in modules.Values)
             {
-                module.OnBuildingConstructed(buildingId);
+                module.OnBuildingsConstructed(buildingId, quote.Quantity);
             }
 
             return true;

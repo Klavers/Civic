@@ -113,6 +113,7 @@ Unity 프로젝트 고유 규약:
 - **GitHub 조회·PR 작업은 `gh` 우선.** 이슈/PR 본문 확인, 코멘트 작성, PR 목록·상태 조회, PR 생성·수정은 가능한 경우 GitHub MCP/API 보다 `gh` 명령어를 먼저 사용한다. 샌드박스 권한 문제로 실패하면 승인 요청 후 재시도한다.
 - **커밋·PR 문구는 한국어 우선.** 커밋 메시지 제목·본문, PR 제목·본문은 기본적으로 한국어로 작성한다. 명령어, 파일 경로, 로그 마커, 테스트 이름처럼 원문 보존이 필요한 기술 문자열은 그대로 둔다.
 - **한글 GitHub 본문은 UTF-8 파일 경유.** Windows PowerShell 에서 한글 본문을 `stdin` 파이프(`... | gh issue comment --body-file -`)로 넘기면 인코딩이 깨질 수 있다. 한글이 포함된 이슈/PR 본문·코멘트는 반드시 **UTF-8 파일로 저장한 뒤** `gh ... --body-file <path>` 또는 동등한 파일 기반 입력으로 업로드한다. 업로드 전 파일 내용을 검토하고, `stdin` 직접 파이프는 사용하지 않는다.
+- **게임 용어사전 선확인.** 신규 게임 용어·버튼·상태 문구·반복 문장을 작성하거나 localization 언어를 추가할 때 `docs/localization/glossary_concepts.csv`와 `glossary_translations.csv`가 존재하면 먼저 확인한다. 사전은 개발자·AI 참고자료이며 runtime·Validator 입력이 아니다. 새 concept 또는 승인된 번역 변경은 관련 문구와 같은 PR에서 사전에 동기화한다.
 
 ## 변경 작업 시 권장 절차
 

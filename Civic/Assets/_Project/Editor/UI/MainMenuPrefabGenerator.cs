@@ -100,12 +100,48 @@ namespace Civic.Editor.UI
                 }
             }
 
+            EnsureMainMenuCamera(activeScene);
+
             if (activeScene.path != MainMenuScenePath || activeScene.isDirty)
             {
                 EditorSceneManager.SaveScene(activeScene, MainMenuScenePath);
             }
 
             EnsureBuildSettings();
+        }
+
+        private static void EnsureMainMenuCamera(Scene scene)
+        {
+            var cameras = UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .Where(item => item.gameObject.scene == scene)
+                .ToArray();
+            var camera = cameras.FirstOrDefault(item => item.CompareTag("MainCamera")) ?? cameras.FirstOrDefault(item => item.name == "Main Camera");
+            if (camera == null)
+            {
+                var cameraObject = new GameObject("Main Camera", typeof(Camera), typeof(AudioListener));
+                SceneManager.MoveGameObjectToScene(cameraObject, scene);
+                camera = cameraObject.GetComponent<Camera>();
+            }
+
+            camera.gameObject.name = "Main Camera";
+            camera.gameObject.tag = "MainCamera";
+            camera.gameObject.SetActive(true);
+            camera.enabled = true;
+            camera.orthographic = true;
+            camera.orthographicSize = 5f;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.025f, 0.04f, 0.055f, 1f);
+            camera.transform.position = new Vector3(0f, 0f, -10f);
+
+            var listeners = UnityEngine.Object.FindObjectsByType<AudioListener>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .Where(item => item.gameObject.scene == scene && item.enabled && item.gameObject.activeInHierarchy)
+                .ToArray();
+            if (camera.GetComponent<AudioListener>() == null)
+            {
+                if (listeners.Length > 0) throw new InvalidOperationException("MainMenu scene already has an active AudioListener outside Main Camera. Remove or move it before generation.");
+                camera.gameObject.AddComponent<AudioListener>();
+            }
+            EditorSceneManager.MarkSceneDirty(scene);
         }
 
         private static GameObject BuildMainMenuBase(string assetPath)
